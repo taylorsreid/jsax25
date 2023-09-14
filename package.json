@@ -1,0 +1,34 @@
+{
+  "name": "axez",
+  "version": "0.0.1",
+  "description": "Simple AX.25 Implementation for Packet Radio",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/themikefuller/axez.git"
+  },
+  "keywords": [
+    "ax25",
+    "ax.25",
+    "packet",
+    "radio",
+    "amateur",
+    "radio",
+    "aprs",
+    "ham",
+    "radio",
+    "hamradio"
+  ],
+  "author": "Mike Fuller",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/themikefuller/axez/issues"
+  },
+  "dependencies":{
+    "serialport":"latest"
+  },
+  "homepage": "https://github.com/themikefuller/axez#readme"
+}
