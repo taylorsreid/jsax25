@@ -72,50 +72,26 @@ const readFrame = (data) => {
   return frame;
 }
 
-function AXEZ(kissPath, readyCallback = null) {
+const openPort = (kissPath, baudRate=1200) => {
+  return new Promise((resolve,reject) =>{
 
-  const serial = new SerialPort({
-    "path":kissPath,
-    "baudRate":1200,
-    "lock":false
-  });
+    let onData = null;
 
-  let axez = {};
-  let onData = null;
-  axez.send = createFrame;
-
-  axez.listen = (callback=null) => {
-    onData = callback;
-  };
-
-  axez.send = (to, from, message, toSSID, fromSSID) => {
-    return new Promise((resolve,reject) => {
-      let frame = createFrame(to, from, message, toSSID, fromSSID);
-      serial.write(frame, (err, result) => {
-        if (err) {
-          reject({"code":400,"message":"Error sending message: " + err.toSring()});
-        } else {
-          resolve(true);
-        }
-      });
+    let serialPort = new SerialPort({
+      "path": kissPath,
+      "baudRate": baudRate,
+      "lock": false
     });
-  }
 
-  serial.on('open', ()=>{
-    if (readyCallback && typeof readyCallback === 'function') {
-      readyCallback(true);
-    }
+    serialPort.on('open', ()=>{
+      resolve(serialPort);
+    });
+
   });
+};
 
-  serial.on('data', (data) => {
-    if (onData && typeof onData === 'function') {
-      let frame = readFrame(data);
-      onData(frame);
-    }
-  });
-
-  return axez;
-
+function AXEZ() {
+  return {readFrame, createFrame, openPort};
 }
 
 module.exports = AXEZ;
