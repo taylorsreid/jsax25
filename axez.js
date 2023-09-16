@@ -2,11 +2,10 @@
 
 const {SerialPort} = require('serialport');
 
-const createFrame = (to, from, message, toSSID = 0, fromSSID = 0) => {
+const createFrame = (frameData={}) => {
+
   let frame = [192, 0];
-  to = to.toLocaleUpperCase();
-  to += "      ";
-  let destination = to.split('').map(val=>{
+  let destination = (frameData.destination.toString().toLocaleUpperCase() + "      ").split('').map(val=>{
     return val.charCodeAt(0) * 2;
   });
   if (destination.length > 6) {
@@ -16,12 +15,10 @@ const createFrame = (to, from, message, toSSID = 0, fromSSID = 0) => {
     frame.push(destination[i]);
   }
 
-  toSSID = (toSSID < 16 && toSSID > -1 ? toSSID : 0) 
-  frame.push(224 + (toSSID * 2));
+  let destinationSSID = (frameData.destinationSSID < 16 && frameData.destinationSSID > -1 ? frameData.destinationSSID : 0)
+  frame.push(96 + (destinationSSID * 2));
 
-  from = from.toLocaleUpperCase();
-  from += "      ";
-  let source = from.split('').map(val=>{
+  let source = (frameData.source.toString().toLocaleUpperCase() + "      ").split('').map(val=>{
     return val.charCodeAt(0) * 2;
   });
   if (source.length > 6) {
@@ -31,16 +28,41 @@ const createFrame = (to, from, message, toSSID = 0, fromSSID = 0) => {
     frame.push(source[i]);
   }
 
-  fromSSID = (fromSSID < 16 && fromSSID > -1 ? fromSSID : 0);
-  frame.push(97 + (fromSSID * 2));
+  let sourceSSID = (frameData.sourceSSID < 16 && frameData.sourceSSID > -1 ? frameData.sourceSSID : 0);
+  if (!frameData.repeaters.length) {
+    frame.push(224 + (sourceSSID * 2) + 1);
+  } else {
+    frame.push(224 + (sourceSSID * 2));
+  }
+
+  let repeaters = frameData.repeaters || [];
+  if (repeaters.length > 0) {
+    for(let i = 0; i < repeaters.length; i++) {
+      let repeater = (repeaters[i].callsign.toLocaleUpperCase() + "      ").split('').map(val=>{
+        return val.charCodeAt(0) * 2;
+      }).slice(0,6);
+      for(let j = 0; j < repeater.length; j++) {
+        frame.push(repeater[j]);
+      }
+      if (i === repeaters.length - 1) {
+        frame.push(((repeaters[i].ssid||0)*2) + 1);
+      } else {
+        frame.push(((repeaters[i].ssid||0)*2));
+      }
+    }
+  }
 
   // Control
-  frame.push(0);
+  if (!frameData.aprs) {
+    frame.push(0);
+  } else {
+    frame.push(3);
+  }
 
   // PID
   frame.push(240);
 
-  let content = message.split('').map(val=>{
+  let content = frameData.message.split('').map(val=>{
     return val.charCodeAt(0);
   });
   for(let i = 0; i < content.length; i++) {
@@ -57,16 +79,59 @@ const readFrame = (data) => {
   frame.destination = result.slice(2,8).map(val=>{
     return String.fromCharCode(val/2);
   }).join('').trim();
-  frame.destinationSSID = result.slice(8)[0] - 224;
-  frame.destinationSSID = (frame.destinationSSID > 0) ? frame.destinationSSID / 2 : 0;
+  frame.destinationSSID = result.slice(8)[0] - 97;
+  frame.destinationSSID = (frame.destinationSSID > 0) ? parseInt(frame.destinationSSID / 2) + 1 : 0;
 
   frame.source = result.slice(9, 15).map(val=>{
     return String.fromCharCode(val/2);
   }).join('').trim();
-  frame.sourceSSID = result.slice(15)[0] - 97;
-  frame.sourceSSID = (frame.sourceSSID > 0) ? frame.sourceSSID / 2 : 0;
+  frame.sourceSSID = result.slice(15)[0] - 224;
+  frame.sourceSSID = (frame.sourceSSID > 0) ? parseInt(frame.sourceSSID / 2) : 0;
 
-  frame.message = result.slice(18, -1).map(val=>{
+  let repeaters = [];
+  let hasRepeaters = false;
+  if (result.slice(15)[0] / 2 === parseInt(result.slice(15)[0] / 2)) {
+    hasRepeaters = true;
+  }
+
+  let position = 18;
+  if (hasRepeaters) {
+    let tail = result.slice(16, result.length - 1);
+    let parts = [];
+    for(let i = 0; i < tail.length; i += 7) {
+      parts.push(tail.slice(i, i + 7));
+    }
+    let allFound = false;
+    for(let j = 0; j < parts.length; j++) {
+      if (parts[j].length < 7 || (parts[j][0] % 2 !== 0 && parts[j][0] !== 0)) {
+        repeaters = parts.slice(0,j);
+        break;
+      }
+      let odds = 0;
+      for(let k = 0; k < parts[j].length; k++) {
+        if (parts[j][k] % 2 !== 0) {
+          odds++;
+          if (odds === 2) {
+            allFound = true;
+            repeaters = parts.slice(0,j);
+            break;
+          }
+        }
+      }
+      if (allFound) {
+        break;
+      }
+    }
+    for(let i = 0; i < repeaters.length; i++) {
+      let callsign = repeaters[i].slice(0,6).map(val=>{return String.fromCharCode(val/2);}).join('').trim();
+      let ssid = parseInt(repeaters[i].slice(6)[0]/2);
+      repeaters[i] = {callsign, ssid};
+    }
+    frame.repeaters = repeaters;
+    position += (7 * repeaters.length);
+  }
+
+  frame.message = result.slice(position, -1).map(val=>{
     return String.fromCharCode(val);
   }).join('');
   return frame;
