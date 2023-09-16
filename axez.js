@@ -29,7 +29,7 @@ const createFrame = (frameData={}) => {
   }
 
   let sourceSSID = (frameData.sourceSSID < 16 && frameData.sourceSSID > -1 ? frameData.sourceSSID : 0);
-  if (!frameData.repeaters.length) {
+  if (!frameData.repeaters || !frameData.repeaters.length) {
     frame.push(224 + (sourceSSID * 2) + 1);
   } else {
     frame.push(224 + (sourceSSID * 2));
@@ -127,9 +127,10 @@ const readFrame = (data) => {
       let ssid = parseInt(repeaters[i].slice(6)[0]/2);
       repeaters[i] = {callsign, ssid};
     }
-    frame.repeaters = repeaters;
     position += (7 * repeaters.length);
   }
+  frame.repeaters = repeaters;
+
 
   frame.message = result.slice(position, -1).map(val=>{
     return String.fromCharCode(val);
