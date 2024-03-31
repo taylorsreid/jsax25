@@ -1,14 +1,14 @@
 {
-  "name": "axez",
-  "version": "0.1.1",
+  "name": "ts-axez",
+  "version": "0.1.2",
   "description": "Simple AX.25 Implementation for Packet Radio",
-  "main": "index.js",
+  "main": "axez.ts",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "ts-node test.ts"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/themikefuller/axez.git"
+    "url": "git+https://github.com/taylorsreid/ts-axez.git"
   },
   "keywords": [
     "ax25",
@@ -22,13 +22,18 @@
     "radio",
     "hamradio"
   ],
-  "author": "Mike Fuller",
+  "author": "Mike Fuller, Taylor Reid",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/themikefuller/axez/issues"
+    "url": "https://github.com/taylorsreid/ts-axez/issues"
   },
-  "dependencies":{
-    "serialport":"latest"
+  "dependencies": {
+    "serialport": "latest"
   },
-  "homepage": "https://github.com/themikefuller/axez#readme"
+  "homepage": "https://github.com/taylorsreid/ts-axez#readme",
+  "devDependencies": {
+    "@types/lodash": "^4.17.0",
+    "@types/node": "^20.11.30",
+    "lodash": "^4.17.21"
+  }
 }
