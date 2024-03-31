@@ -92,6 +92,8 @@ else if (SEND_RECEIVE === 'none') {
 	}
 	else {
 		console.log('Original and decoded frames do not match.')
+		console.log(testFrame)
+		console.log(decodedFrame)
 	}
 }
 else {

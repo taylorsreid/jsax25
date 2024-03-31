@@ -122,7 +122,9 @@ export function readFrame(encodedAxezFrame: EncodedAxezFrame): DecodedAxezFrame 
         return String.fromCharCode(val / 2); // TODO: why divide by 2
     }).join('').trim();
     frame.destinationSSID = result.slice(8)[0] - 97; // why???
-    frame.destinationSSID = (frame.destinationSSID > 0) ? (frame.destinationSSID / 2) + 1 : 0;
+    // fixed bug here. SourceSSID was being coerced to int through parseInt (which is only supposed to take a string arg). Math.floor is safer.
+    // sourceSSID needs to be rounded down, as a decimal can be accidentally added as a result of dividing by 2
+    frame.destinationSSID = (frame.destinationSSID > 0) ? Math.floor(frame.destinationSSID / 2) + 1 : 0;
 
     // get the encoded source callsign
     frame.source = result.slice(9, 15).map(val => {
