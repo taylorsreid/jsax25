@@ -4,15 +4,12 @@ import { DecodedAxezFrame, openPort, createFrame, readFrame, EncodedAxezFrame, R
 import lodash from 'lodash'
 // ******************** SET YOUR TEST VARIABLES ********************
 
-// const YOUR_CALL: string = 'NOCALL'
-const YOUR_CALL: string = 'KO4LCM'
+const YOUR_CALL: string = 'NOCALL'
 const YOUR_SSID: number = 0
-// const THEIR_CALL = 'NOCALL'
-const THEIR_CALL = 'KO4LCM'
+const THEIR_CALL = 'NOCALL'
 const THEIR_SSID: number = 1
 const MESSAGE: string = 'Hello World'
-// const SEND_RECEIVE: 'send' | 'receive' | 'none' = 'none'
-const SEND_RECEIVE: 'send' | 'receive' | 'none' = 'receive'
+const SEND_RECEIVE: 'send' | 'receive' | 'none' = 'none'
 const PORT_NAME: string = 'COM5' // the serial port to send the test to, platform specific, ex. /tmp/kisstnc on Linux, COM5 on Windows, etc
 const TEST_TYPE: 'simplex' | 'digipeater' | 'aprs' = 'simplex'
 
