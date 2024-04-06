@@ -1,6 +1,6 @@
 {
-  "name": "ts-axez",
-  "version": "0.1.2",
+  "name": "kissconnection",
+  "version": "1",
   "description": "Simple AX.25 Implementation for Packet Radio",
   "main": "axez.ts",
   "scripts": {
@@ -28,10 +28,12 @@
     "url": "https://github.com/taylorsreid/ts-axez/issues"
   },
   "dependencies": {
+    "json-buffer": "^3.0.1",
     "serialport": "latest"
   },
   "homepage": "https://github.com/taylorsreid/ts-axez#readme",
   "devDependencies": {
+    "@types/json-buffer": "^3.0.2",
     "@types/lodash": "^4.17.0",
     "@types/node": "^20.11.30",
     "lodash": "^4.17.21"
