@@ -1,6 +1,5 @@
-import { DecodedKissFrame, KissConnection, Repeater, KissConnectionConstructor, Serializable } from "./kissconnection";
+import { KissOutput, KissConnection, Repeater, KissConnectionConstructor, Serializable, KissInput } from "./kissconnection";
 import { isEqual } from 'lodash'
-import JSONB from 'json-buffer'
 
 // ******************** SET YOUR TEST VARIABLES BELOW ********************
 const MY_CALLSIGN:string = 'KO4LCM'
@@ -16,13 +15,13 @@ const CONSTRUCTOR:KissConnectionConstructor = {
     // tcpPort: 8100,
     // filterByCallsign: false,
     // filterBySsid: false,
-    // compression: true
+    compression: true
 }
 
 // ******************** DIFFERENT FRAME TYPES ********************
-const STRING:string = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Mauris vitae sapien mollis, hendrerit nulla sit amet, vehicula nunc.'
+const STRING:string = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Mauris vitae sapien mollis, hendrerit nulla sit amet, vehicula nunc. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Mauris vitae sapien mollis, hendrerit nulla sit amet, vehicula nunc.'
 const NUMBER:number = 8675309
-const OBJECT:Object = {key:'value'}
+const OBJECT:Object = {key:STRING}
 const STRING_ARRAY:string[] = STRING.split(' ')
 const NUMBER_ARRAY:number[] = [8, 6, 7, 5, 3, 0, 9]
 const OBJECT_ARRAY:Object[] = [OBJECT, OBJECT, OBJECT]
@@ -62,15 +61,14 @@ const SERIALIZABLE_ARRAY:TestObject[] = [
 // ******************** SET WHICH FRAME TYPE TO USE BY COMMENTING OUT THE REST ********************
 
 // simplex
-// const testFrame:KissFrameOptionalSource|KissFrameWithSource = {
-// 	source: MY_CALLSIGN,
-// 	sourceSsid: MY_SSID,
-// 	destination: THEIR_CALLSIGN,
-// 	destinationSsid: THEIR_SSID,
-// 	message: STRING,
-// 	repeaters: [] as Repeater[],
-// 	aprs: false
-// }
+const testFrame:KissInput = {
+	sourceCallsign: MY_CALLSIGN,
+	sourceSsid: MY_SSID,
+	destinationCallsign: THEIR_CALLSIGN,
+	destinationSsid: THEIR_SSID,
+	payload: STRING,
+	repeaters: [] as Repeater[],
+}
 
 // // using digipeaters
 // const testFrame = {
@@ -89,26 +87,26 @@ const SERIALIZABLE_ARRAY:TestObject[] = [
 // }
 
 // using APRS
-const testFrame:DecodedKissFrame = {
-	sourceCallsign: MY_CALLSIGN,
-	sourceSsid: MY_SSID,
-	destinationCallsign: THEIR_CALLSIGN,
-	destinationSsid: THEIR_SSID,
-	payload: `:${MY_CALLSIGN}-${MY_SSID}:${STRING}`,
-	repeaters: [
-		{
-			callsign: "WIDE1",
-			ssid: 1,
-			hasBeenRepeated: true
-		},
-		{
-			callsign: "WIDE2",
-			ssid: 2,
-			hasBeenRepeated: true
-		}
-	],
-	frameType: 'information'
-}
+// const testFrame:DecodedKissFrame = {
+// 	sourceCallsign: MY_CALLSIGN,
+// 	sourceSsid: MY_SSID,
+// 	destinationCallsign: THEIR_CALLSIGN,
+// 	destinationSsid: THEIR_SSID,
+// 	payload: `:${MY_CALLSIGN}-${MY_SSID}:${STRING}`,
+// 	repeaters: [
+// 		{
+// 			callsign: "WIDE1",
+// 			ssid: 1,
+// 			hasBeenRepeated: true
+// 		},
+// 		{
+// 			callsign: "WIDE2",
+// 			ssid: 2,
+// 			hasBeenRepeated: true
+// 		}
+// 	],
+// 	frameType: 'information'
+// }
 
 // ******************** SET WHICH TESTS TO RUN BY COMMENTING OUT LINES ********************
 
@@ -124,60 +122,39 @@ listenTest()
 // sendAndListenTest()
 
 // ******************** ACTUAL TEST FUNCTIONS ********************
-// function encodeDecodeTest() {
-// 	console.log('Testing static encode and decode methods...')
-// 	console.time('\tencodeDecodeTest')
-// 	// test uncompressed
-// 	SERIALIZABLE_ARRAY.map((testable:TestObject) => {
-// 		let decoded:KissFrameWithSource
-// 		try {
-// 			decoded = KissConnection.getDecodedFrame(KissConnection.getEncodedFrame({
-// 				sourceCallsign: MY_CALLSIGN,
-// 				destinationCallsign: MY_CALLSIGN,
-// 				payload: testable.value,
-// 				frameType: 'information'
-// 			}, false))
-// 			console.log(`\n\tEncoding and decoding an uncompressed ${testable.type}... \x1b[32mPASS\x1b[0m`)
+function encodeDecodeTest() {
+	console.log('Testing encode and decode methods...')
+	SERIALIZABLE_ARRAY.map((testable:TestObject) => {
+		const kissConnection = new KissConnection(CONSTRUCTOR)
+		try {
+			let original:KissInput = {
+				sourceCallsign: MY_CALLSIGN,
+				sourceSsid: 0,
+				destinationCallsign: MY_CALLSIGN,
+				destinationSsid: 1,
+				payload: testable.value
+			}
+			let originalCopy = structuredClone(original) // MUST USE STRUCTUREDCLONE OTHERWISE THE ORIGINAL IS MUTATED AND THE TEST FAILS
+			let decoded = kissConnection.decode(kissConnection.encode(originalCopy))
+			console.log(`\n\tEncoding and decoding a ${testable.type}... \x1b[32mPASS\x1b[0m`)
 
-// 			if (isEqual(testable.value, decoded.payload)) {
-// 				console.log(`\tTesting if received and original ${testable.type}s match... \x1b[32mPASS\x1b[0m`)
-// 			}
-// 			else {
-// 				console.log(`\tTesting if received and original ${testable.type} match... \x1b[31mFAIL\x1b[0m`)
-// 				console.log(`\tOriginal: ${JSONB.stringify(testable.value)}`)
-// 				console.log(`\t\Decoded: ${JSONB.stringify(decoded.payload)}`)
-// 			}
-// 		} catch (error) {
-// 			console.log(`\tEncoding and decoding an uncompressed ${testable.type}... \x1b[31mFAIL\x1b[0m`)
-// 		}
-// 	})
-
-// 	// test compressed
-// 	SERIALIZABLE_ARRAY.map((testable:TestObject) => {
-// 		let decoded:KissFrameWithSource
-// 		try {
-// 			decoded = KissConnection.decode(KissConnection.getEncodedFrame({
-// 				sourceCallsign: MY_CALLSIGN,
-// 				destinationCallsign: MY_CALLSIGN,
-// 				payload: testable.value,
-// 				frameType: 'information'
-// 			}, true))
-// 			console.log(`\n\tEncoding and decoding an compressed ${testable.type}... \x1b[32mPASS\x1b[0m`)
-
-// 			if (isEqual(testable.value, decoded.payload)) {
-// 				console.log(`\tTesting if received and original ${testable.type}s match... \x1b[32mPASS\x1b[0m`)
-// 			}
-// 			else {
-// 				console.log(`\tTesting if received and original ${testable.type} match... \x1b[31mFAIL\x1b[0m`)
-// 				console.log(`\tOriginal: ${JSONB.stringify(testable.value)}`)
-// 				console.log(`\t\Decoded: ${JSONB.stringify(decoded.payload)}`)
-// 			}
-// 		} catch (error) {
-// 			console.log(`\tEncoding and decoding an compressed ${testable.type}... \x1b[31mFAIL\x1b[0m`)
-// 		}
-// 	})
-// 	console.timeEnd('\tencodeDecodeTest')
-// }
+			if (isEqual(original.payload, decoded.payload)) {
+				console.log(`\tTesting if received and original ${testable.type}s match... \x1b[32mPASS\x1b[0m`)
+				console.log(decoded)
+			}
+			else {
+				console.log(`\tTesting if received and original ${testable.type} match... \x1b[31mFAIL\x1b[0m`)
+				console.log('Original: ')
+				console.log(original)
+				console.log('Decoded: ')
+				console.log(decoded)
+			}
+		} catch (error) {
+			console.log(`\tEncoding and decoding a ${testable.type}... \x1b[31mFAIL\x1b[0m`)
+			console.log(error)
+		}
+	})
+}
 
 function createConnectionTest() {
 	console.log(`Testing creating a connection...`)
@@ -205,32 +182,32 @@ function createConnectionTest() {
 	}
 }
 
-// function sendTest() {
-// 	console.log('Testing sending data...')
-// 	console.time('\tsendTest')
-// 	try {
-// 		const kissConnection = new KissConnection(CONSTRUCTOR)
-// 		if (kissConnection.isSerial()) {
-// 			kissConnection.send(testFrame)
-// 			console.log(`\tSending data to ${kissConnection.getSerialPort()} at ${kissConnection.getSerialBaud()} baud.... \x1b[32mPASS\x1b[0m`)
-// 		}
-// 		else if (kissConnection.isTcp()) {
-// 			kissConnection.send(testFrame)
-// 			console.log(`\tSending data to ${kissConnection.getTcpHost()}:${kissConnection.getTcpPort()}... \x1b[32mPASS\x1b[0m`)
-// 		}
-// 		kissConnection.close()
-// 		console.timeEnd('\tsendTest')
-// 	}
-// 	catch(error) {
-// 		if (error instanceof ReferenceError) {
-// 			console.log('\tConnection test failed, aborting send test... \x1b[33mWARNING\x1b[0m')
-// 		}
-// 		else {
-// 			console.log('\tSend test... \x1b[31mFAIL\x1b[0m')
-// 		}
-// 		console.timeEnd('\tsendTest')
-// 	}
-// }
+function sendTest() {
+	console.log('Testing sending data...')
+	console.time('\tsendTest')
+	try {
+		const kissConnection = new KissConnection(CONSTRUCTOR)
+		if (kissConnection.isSerial()) {
+			kissConnection.send(testFrame)
+			console.log(`\tSending data to ${kissConnection.getSerialPort()} at ${kissConnection.getSerialBaud()} baud.... \x1b[32mPASS\x1b[0m`)
+		}
+		else if (kissConnection.isTcp()) {
+			kissConnection.send(testFrame)
+			console.log(`\tSending data to ${kissConnection.getTcpHost()}:${kissConnection.getTcpPort()}... \x1b[32mPASS\x1b[0m`)
+		}
+		kissConnection.close()
+		console.timeEnd('\tsendTest')
+	}
+	catch(error) {
+		if (error instanceof ReferenceError) {
+			console.log('\tConnection test failed, aborting send test... \x1b[33mWARNING\x1b[0m')
+		}
+		else {
+			console.log('\tSend test... \x1b[31mFAIL\x1b[0m')
+		}
+		console.timeEnd('\tsendTest')
+	}
+}
 
 function listenTest() {
 	console.log('Testing listening...')
@@ -242,10 +219,8 @@ function listenTest() {
 		else if (kissConnection.isTcp()) {
 			console.log(`\tListening on ${kissConnection.getTcpHost()}:${kissConnection.getTcpPort()}...`)
 		}
-		kissConnection.on('data', (decodedFrame:DecodedKissFrame) => {
-			console.log('\tReceived: ')
+		kissConnection.on('data', (decodedFrame:KissOutput) => {
 			console.log(decodedFrame)
-			console.log('\t\x1b[33mWARNING:\x1b[0m You must manually verify that this frame meets what you expected.')
 		})
 	}
 	catch (error) {
@@ -254,6 +229,7 @@ function listenTest() {
 		}
 		else {
 			console.log('\tListening test... \x1b[31mFAIL\x1b[0m')
+			console.log(error)
 		}
 		
 	}
