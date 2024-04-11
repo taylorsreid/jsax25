@@ -529,6 +529,11 @@ export class KissConnection extends EventEmitter {
         return decoded
     }
 
+    /**
+     * Takes your JSON KissInput objects and translates them into an AX.25 frame/packet that you can send to your software modem or TNC.
+     * @param decoded your JSON KissInput object.
+     * @returns an EncodedKissFrame suitable for sending to your TNC.
+     */
     public encode(decoded: KissInput): EncodedKissFrame {
 
         // check for user error before spending CPU cycles to encode
@@ -559,6 +564,7 @@ export class KissConnection extends EventEmitter {
         decoded.sourceSsid ??= 0
 
         // set each repeater to has not been repeated if it's not defined
+        decoded.repeaters ??= []
         decoded.repeaters.map((r) => {
             r.hasBeenRepeated ??= false
         })
@@ -664,5 +670,4 @@ export class KissConnection extends EventEmitter {
         encoded.push(0xC0) // FEND flag
         return encoded
     }
-
 }

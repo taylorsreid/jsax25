@@ -1,10 +1,12 @@
 {
   "name": "jsax25",
-  "version": ".9",
-  "description": "Simple AX.25 Implementation for Packet Radio",
-  "main": "kissconnection.ts",
+  "version": "1.0",
+  "description": "A Javascript connector class for amateur radio KISS connections that encodes, compresses, decompresses, and decodes KISS + AX.25 frames.",
+  "main": "dist/kissconnection.js",
+  "types": "dist/kissconnection.d.ts",
   "scripts": {
-    "test": "ts-node test.ts"
+    "test": "ts-node test.ts",
+    "build": "tsc"
   },
   "repository": {
     "type": "git",
