@@ -22,9 +22,9 @@ export type Serializable = string | number | JSON | Object | string[] | number[]
  * @attribute destinationCallsign: string - The destination amateur radio callsign.
  * @attribute destinationSsid: number - The destination's SSID. Default 0 if not defined.
  * @attribute destinationCommand?: boolean - Whether the frame is a command frame from the destination or not. Must be opposite of sourceCommand.
- * @attribute sourceCallsign?: string - The sender's amateur radio callsign. Optional when sending via the class instance send() method because it can be set in the constructor.
- * @attribute sourceSsid?: number - The sender's SSID. Default 0 if not defined.
- * @attribute sourceCommand?: boolean - Whether the frame is a command frame from the source or not. Must be opposite of destinationCommand.
+ * @attribute sourceCallsign: string - The sender's amateur radio callsign.
+ * @attribute sourceSsid: number - The sender's SSID. Default 0 if not defined.
+ * @attribute sourceCommand: boolean - Whether the frame is a command frame from the source or not. Must be opposite of destinationCommand.
  * @attribute sourceAcceptsCompression: boolean - If the sender is using this library, indicates whether they support compression using the Brotli algorithm.
  * @attribute payloadIsCompressed: boolean - If the sender is using this library, indicates whether the payload is compressed or not. The payload is not always compressed even if compression is enabled, for instance if the compressed version is longer than the uncompressed version.
  * @attribute payload: Serializable - The payload/body of your packet frame. Can be of multiple different types, see exported Serializable interface for exact allowed types.
@@ -63,36 +63,21 @@ export interface KissOutput {
 
 /**
  * @attribute destinationCallsign: string - The destination amateur radio callsign.
- * @attribute destinationSsid: number - The destination's SSID. Default 0 if not defined.
- * @attribute sourceCallsign?: string - The sender's amateur radio callsign. Optional when sending via the class instance send() method because it can be set in the constructor.
+ * @attribute destinationSsid?: number - The destination's SSID. Default 0 if not defined.
+ * @attribute sourceCallsign: string - The sender's amateur radio callsign.
  * @attribute sourceSsid?: number - The sender's SSID. Default 0 if not defined.
  * @attribute payload: Serializable - The payload/body of your packet frame. Can be of multiple different types, see exported Serializable interface for exact allowed types.
  * @attribute repeaters?: Repeater[] - The repeater path you wish to use in sending the packet, or the path that the packet was received on. Default none if not defined.
  * @attribute frametype?: 'information'|'supervisory'|'unnumbered' - The frame type being sent. Default and most common is 'unnumbered'.
  * @attribute pid?: number - The PID indicates which layer 3 protocol is in use, default is 240 which is none.
  */
-export interface KissInput {
-    /** The destination amateur radio callsign. */
-    destinationCallsign: string,
-    /** The destination's SSID. Default 0 if not defined. */
-    destinationSsid: number,
-    /** The sender's callsign. Optional when sending via the class instance send() method because it can be set in the constructor. */
-    sourceCallsign?: string,
-    /** The sender's SSID. Default 0 if not defined. */
-    sourceSsid?: number,
-    /** The payload/body of your packet frame. Can be of multiple different types, see exported Serializable interface for exact allowed types. */
-    payload: Serializable,
-    /** The repeater path you wish to use in sending the packet, or the path that the packet was received on. Default none if not defined. */
-    repeaters?: Repeater[],
-    /** Which of the allowed frame types the frame is, unnumbered is the most common in APRS and is the default. */
+export interface KissInput extends Omit<KissOutput, 'destinationCommand' | 'sourceCommand' | 'sourceAcceptsCompression' | 'payloadIsCompressed' | 'frameType' | 'pid' | 'repeaters'> {
+    repeaters?: Repeater[]
     frameType?: 'information'|'supervisory'|'unnumbered',
-    /** The PID indicates which layer 3 protocol is in use, default is 240 which is none. */
     pid?: number
 }
 
-/** TODO: REVISE
- * @attribute callsign?: string - Your amateur radio callsign. Optional, but if you do not provide it to the constructor object, it must be included in every frame object passed to the send() method.
- * @attribute ssid?: number - Your station SSID. Default 0 if not defined.
+/**
  * @attribute serialPort?: string - The path to your TNC or software modem's serial port. If defined, it will override any TCP options that you include. Leave blank to use TCP. No default.
  * @attribute serialBaud?: number - A custom baud rate for your TNC or software modem's serial port. Default 1200 (most common) if not defined.
  * @attribute tcpHost?: string - The IP address or URL to your TNC or software mode. Default '127.0.0.1' (most common) if not defined.
@@ -102,10 +87,6 @@ export interface KissInput {
  */
 
 export interface KissConnectionConstructor {
-    /** Your amateur radio callsign. Optional, but if you do not provide it to the constructor object, it must be included in every frame object passed to the send() method. */
-    callsign?: string,
-    /** Your station SSID. Default 0 if not set. */
-    ssid?: number,
     /** The path to your TNC or software modem's serial port. If defined, it will override any TCP options that you include. Leave blank to use TCP.  No default. */
     serialPort?: string,
     /** A custom baud rate for your TNC or software modem's serial port. Default 1200 (most common) if not defined. */
@@ -116,49 +97,38 @@ export interface KissConnectionConstructor {
     tcpPort?: number,
     /** Enable optional compression of the payload/body portion of the packet using the brotli algorithm. Callsigns and SSIDs are not compressed in the spirit of amateur radio. Note that regardless of setting, if for some reason the compressed version is larger than the uncompressed version, the uncompressed version is sent. Default false if not defined. */
     compression?: boolean
-    /** Mostly used for testing. SerialPort and Socket will by default print errors to the console, set this to true to disable them. Default false if not defined. */
+    /** SerialPort and Socket will by default print errors to the console, set this to true to disable them. Default false if not defined. */
     suppressConnectionErrors?: boolean
 }
 
 /**
- * A SerialPort/Socket connection to a TNC or software modem that builds, compresses (optional), sends, receives, decodes, decompresses, and emits AX.25 packets for amateur radio use.
+ * A SerialPort/Socket connection to a TNC or software modem that encodes, compresses (optional), sends, receives, decodes, decompresses (if necessary), and emits AX.25 packets for amateur radio use.
  * 
- * See interface KissConnectionConstructor for constructor options.
+ * See exported interface KissConnectionConstructor for constructor options.
  * 
  * send(frameOrFrames:KissFrameOptionalSource|KissFrameOptionalSource[]) takes unencoded kiss frame(s) (see interface KissInput for format), runs them through the above mentioned processes, and sends them immediately.
  * 
- * On receive, emits events like the SerialPort, Socket, and EventEmitter classes,
- * you can listen for incoming data with the instance's on(CHANNEL_NAME, (decodedPacket) => {}) method, where channel name is one of three options:
- *   on('data', (frame:KissFrameWithSource) => {//do stuff}) emits all received packets, regardless of source callsign, source SSID, destination callsign, or destination SSID.
- *   on('callsign', (frame:KissFrameWithSource) => {//do stuff}) emits packets that are addressed to your callsign regardless of whether it matches your set SSID
- *   on('callsignSsid', (frame:KissFrameWithSource) => {//do stuff}) only emits packets that are addressed to both your set callsign and your set SSID (which is 0 if you don't set one)
- *   You can listen to any single channel or combination of channels that you wish.
+ * On receive, emits events like the SerialPort, Socket, and EventEmitter classes, you can listen for incoming data with the instance's on('data', (decodedPacket) => {//do stuff}) method, 
  */
 export class KissConnection extends EventEmitter {
     private conn: SerialPort | Socket
-    private callsign: string
-    private ssid: number
     private serialPort: string
     private serialBaud: number
     private tcpHost: string
     private tcpPort: number
     private compression: boolean
     private suppressConnectionErrors: boolean
-    private localStorage = new LocalStorage('./acceptsCompression')
+    private compressionCache = new LocalStorage('./compressionCache')
 
     /**
-     * @attribute callsign?: string - Your amateur radio callsign. Optional, but if you do not provide it to the constructor object, it must be included in every frame object passed to the send() method.
-     * @attribute ssid?: number - Your station SSID. Default 0 if not defined.
      * @attribute serialPort?: string - The path to your TNC or software modem's serial port. If defined, it will override any TCP options that you include. Leave blank to use TCP. No default.
      * @attribute serialBaud?: number - A custom baud rate for your TNC or software modem's serial port. Default 1200 (most common) if not defined.
      * @attribute tcpHost?: string - The IP address or URL to your TNC or software mode. Default '127.0.0.1' (most common) if not defined.
      * @attribute tcpPort?: number - The TCP port to your TNC or software modem. Default 8100 (most common) if not defined.
      * @attribute compression?: boolean - Enable optional compression of the payload/body portion of the packet using the brotli algorithm. Callsigns and SSIDs are not compressed in the spirit of amateur radio. Note that regardless of setting, if for some reason the compressed version is larger than the uncompressed version, the uncompressed version is sent. Default false if not defined.
-     * @attribute suppressConnectionErrors:? boolean - Mostly used for testing. SerialPort and Socket will by default print errors to the console, set this to true to disable them. Default false if not defined.
+     * @attribute suppressConnectionErrors:? boolean - SerialPort and Socket will by default print errors to the console, set this to true to disable them. Default false if not defined.
      */
     constructor(options?: {
-        callsign?: string,
-        ssid?: number,
         serialPort?: string,
         serialBaud?: number
         tcpHost?: string,
@@ -169,15 +139,22 @@ export class KissConnection extends EventEmitter {
 
         super()
 
-        // set all class properties, include defaults
-        this.callsign = options.callsign.toUpperCase()
-        this.ssid = options.ssid ?? 0
-        this.serialPort = options.serialPort
-        this.serialBaud = options.serialBaud ?? 1200
-        this.tcpHost = options.tcpHost ?? '127.0.0.1'
-        this.tcpPort = options.tcpPort ?? 8100
-        this.compression = options.compression ?? false
-        this.suppressConnectionErrors = options.suppressConnectionErrors ?? false
+        // set all class properties to passed args, or to default if not set
+        if (options) {
+            this.serialPort = options.serialPort
+            this.serialBaud = options.serialBaud ?? 1200
+            this.tcpHost = options.tcpHost ?? '127.0.0.1'
+            this.tcpPort = options.tcpPort ?? 8100
+            this.compression = options.compression ?? false
+            this.suppressConnectionErrors = options.suppressConnectionErrors ?? false
+        }
+        else {
+            this.tcpHost = '127.0.0.1'
+            this.tcpPort = 8100
+            this.compression = false
+            this.suppressConnectionErrors = false
+        }
+        
 
         // if serial connection selected, create. else create tcp
         if (this.serialPort) {
@@ -202,20 +179,8 @@ export class KissConnection extends EventEmitter {
         // attach event listener upon object instantiation
         this.conn.on('data', (data) => {
 
-            // decode frame to emit
-            const decodedFrame = this.decode(data)
-
             // emit the data to the unfiltered channel in case the dev wants to listen for both data addressed to them and not addressed to them
-            this.emit('data', decodedFrame)
-
-            if (decodedFrame.destinationCallsign === this.callsign) {
-                this.emit('callsign', decodedFrame)
-            }
-
-            // emit data to the filtered channel if it matches the callsign and ssid
-            if (decodedFrame.destinationCallsign === this.callsign && decodedFrame.destinationSsid === this.ssid) {
-                this.emit('callsignSsid', decodedFrame)
-            }
+            this.emit('data', this.decode(data))
 
             //TODO: implement resending if supervisory frame is requesting it
             // if (decodedFrame.frameType === 'supervisory') {
@@ -225,22 +190,6 @@ export class KissConnection extends EventEmitter {
         })
     }
 
-    public getCallsign(): string {
-        return this.callsign
-    }
-
-    public getSsid(): number {
-        return this.ssid
-    }
-
-    public setCallsign(callsign: string): void {
-        this.callsign = callsign
-    }
-
-    public setSsid(ssid: number): void {
-        this.ssid = ssid
-    }
-
     /**
      * Check to see if the connection is open.
      */
@@ -248,6 +197,9 @@ export class KissConnection extends EventEmitter {
         return !this.conn.closed
     }
 
+    /**
+     * Close the current serial or TCP connection.
+     */
     public close(): void {
         this.conn.end()
     }
@@ -320,8 +272,8 @@ export class KissConnection extends EventEmitter {
     }
 
     /**
-     * Takes your unencoded KissInstanceFrame objects, validates them, optionally compressed them (configured in constructor), encodes them in KISS AX.25 format, and sends them immediately.
-     * @param decodedFrameOrFrames - A single decoded KissInstanceFrame object or an array of them.
+     * Takes your unencoded KissInput object(s), encodes them via the encode() method, and sends them immediately.
+     * @param decodedFrameOrFrames - A single KissInput object or an array of them.
      * @returns the number of frames sent.
      */
     public send(decodedFrameOrFrames: KissInput | KissInput[]): number {
@@ -345,12 +297,24 @@ export class KissConnection extends EventEmitter {
         }
     }
 
+    /**
+     * Updates the localstorage cache whether or not a callsign + SSID combo supports compression.
+     * @param callsign the callsign to store.
+     * @param ssid the callsign's SSID to store, an operator may have devices that do not support the custom compression of this class, so it's important to store them with SSID.
+     * @param supportsCompression boolean value whether the callsign + SSID combo supports this class' custom Brotli compression algorithm.
+     */
     private setCompressionCache(callsign: string, ssid: number, supportsCompression: boolean): void {
-        this.localStorage.setItem(`kc_compression_cache_${callsign}-${ssid}`, `${supportsCompression}`)
+        this.compressionCache.setItem(callsign + '-' + ssid, `${supportsCompression}`)
     }
 
+    /**
+     * Check the localstorage whether or not a callsign + SSID combo supports compression.
+     * @param callsign the callsign to check.
+     * @param ssid the callsign's SSID to check, an operator may have devices that do not support the custom compression of this class, so it's important to check the SSID as well.
+     * @returns boolean value whether the callsign + SSID combo supports this class' custom Brotli compression algorithm.
+     */
     private getCompressionCache(callsign: string, ssid: number): boolean {
-        return this.localStorage.getItem(`kc_compression_cache_${callsign}-${ssid}`) === 'true'
+        return this.compressionCache.getItem(callsign + '-' + ssid) === 'true'
     }
 
     /**
@@ -452,7 +416,9 @@ export class KissConnection extends EventEmitter {
         decoded.sourceSsid = decodeSsid(position + 6) // position = 14
         decoded.payloadIsCompressed = decodePayloadIsCompressed(position + 6) // position = 14
         decoded.sourceAcceptsCompression = decodeAcceptsCompression(position + 6) // position = 14
-        this.setCompressionCache(decoded.sourceCallsign, decoded.sourceSsid, decoded.sourceAcceptsCompression)
+        if (decoded.sourceAcceptsCompression) { // if to reduce fs writes
+            this.setCompressionCache(decoded.sourceCallsign, decoded.sourceSsid, true)
+        }
         decoded.sourceCommand = !decoded.destinationCommand // The bit at index 0 of the ssid field sets the command. Command = true = 0, response = false = 1, inverted from destination command
 
         // if the last bit of the SSID byte is a 0, it indicates that there are up to 2 repeater address fields to follow
@@ -528,15 +494,16 @@ export class KissConnection extends EventEmitter {
         if (decoded.payloadIsCompressed) {
             try {
                 decoded.payload = brotliDecompressSync(JSONB.parse(decoded.payload as string)).toString()
-                // this.setCompressionCache(decoded.sourceCallsign, decoded.sourceSsid, true) // save to cache for future that this callsign + SSID combo supports compression
             } catch (error) { // if decompression fails then it must have been a misread
                 decoded.payloadIsCompressed = false
-                // this.setCompressionCache(decoded.sourceCallsign, decoded.sourceSsid, false) // save to cache for future that this callsign + SSID combo does NOT support compression
             }
         }
 
-        // TODO: some characters not decoding, rare but happens
-        // TODO: strip \r and \n
+        
+        // strip whitespace that some sources occasionally send
+        decoded.payload = (decoded.payload as string).trim()
+
+        // TODO: some characters not decoding correctly, rare but happens
         // if the decoded payload starts with JSON characters, parse it
         if ((decoded.payload as string).startsWith('{') || (decoded.payload as string).startsWith('[')) {
             try {
@@ -559,50 +526,49 @@ export class KissConnection extends EventEmitter {
         return decoded
     }
 
-    public encode(decodedKissFrame: KissInput): EncodedKissFrame {
+    public encode(decoded: KissInput): EncodedKissFrame {
 
         // check for user error before spending CPU cycles to encode
-        if (!this.callsign && !decodedKissFrame.sourceCallsign) {
-            throw new Error('No source callsign is set for this frame or instance. A source callsign must be set in every frame or a default must be set in the class constructor.');
+        if (decoded.destinationCallsign.length > 6) {
+            throw new Error(`Destination callsign ${decoded.destinationCallsign} is over the maximum length of 6 characters by ${decoded.destinationCallsign.length - 6}.`);
         }
-        if (decodedKissFrame.destinationCallsign.length > 6) {
-            throw new Error(`Destination callsign ${decodedKissFrame.destinationCallsign} is over the maximum length of 6 characters by ${decodedKissFrame.destinationCallsign.length - 6}.`);
+        if (decoded.destinationSsid < 0 || decoded.destinationSsid > 15) {
+            throw new Error(`Destination SSID ${decoded.destinationSsid} in invalid, the value must be between 0 and 15.`)
         }
-        decodedKissFrame.destinationSsid ??= 0
-        if (decodedKissFrame.destinationSsid < 0 || decodedKissFrame.destinationSsid > 15) {
-            throw new Error(`Destination SSID ${decodedKissFrame.destinationSsid} in invalid, the value must be between 0 and 15.`)
+        if (decoded.sourceCallsign.length > 6) {
+            throw new Error(`Callsign ${decoded.sourceCallsign} is over the maximum length of 6 characters by ${decoded.sourceCallsign.length - 6}`);
         }
-        if (decodedKissFrame.sourceCallsign.length > 6) {
-            throw new Error(`Callsign ${decodedKissFrame.sourceCallsign} is over the maximum length of 6 characters by ${decodedKissFrame.sourceCallsign.length - 6}`);
-        }
-        decodedKissFrame.sourceSsid ??= 0
-        if (decodedKissFrame.sourceSsid < 0 || decodedKissFrame.sourceSsid > 15) {
-            throw new Error(`Source SSID ${decodedKissFrame.sourceSsid} in invalid, the value must be between 0 and 15.`)
+        if (decoded.sourceSsid < 0 || decoded.sourceSsid > 15) {
+            throw new Error(`Source SSID ${decoded.sourceSsid} in invalid, the value must be between 0 and 15.`)
         }
 
         // Go through optionals and set them to reasonable defaults. Leave none of the optionals as undefined to prevent undefined type errors and adhere to AX.25 standard.
-        decodedKissFrame.destinationCallsign = decodedKissFrame.destinationCallsign.toUpperCase() // AX.25 spec states that callsigns must be capital letters
-        while (decodedKissFrame.destinationCallsign.length < 6) {
-            decodedKissFrame.destinationCallsign += ' ' // pad callsign with spaces if it's under spec length
+        decoded.destinationCallsign = decoded.destinationCallsign.toUpperCase() // AX.25 spec states that callsigns must be capital letters
+        while (decoded.destinationCallsign.length < 6) {
+            decoded.destinationCallsign += ' ' // pad callsign with spaces if it's under spec length
         }
-        // AX.25 spec states that callsigns must be capital letters, class instance callsign already uppercased in constructor
-        decodedKissFrame.sourceCallsign = decodedKissFrame.sourceCallsign.toUpperCase() ?? this.callsign
-        while (decodedKissFrame.sourceCallsign.length < 6) {
-            decodedKissFrame.sourceCallsign += ' ' // pad callsign with spaces if it's under spec length
+        decoded.destinationSsid ??= 0
+        
+        decoded.sourceCallsign = decoded.sourceCallsign.toUpperCase() // AX.25 spec states that callsigns must be capital letters
+        while (decoded.sourceCallsign.length < 6) {
+            decoded.sourceCallsign += ' ' // pad callsign with spaces if it's under spec length
         }
-        if (typeof decodedKissFrame.payload !== 'string') {
-            decodedKissFrame.payload = JSONB.stringify(decodedKissFrame.payload) // stringify if it isn't a string already
+        decoded.sourceSsid ??= 0
+
+        // stringify if it isn't a string already
+        if (typeof decoded.payload !== 'string') {
+            decoded.payload = JSONB.stringify(decoded.payload) 
         }
-        decodedKissFrame.repeaters ??= [] // set repeaters to empty if none set
-        decodedKissFrame.frameType ??= 'unnumbered'
-        decodedKissFrame.pid ??= 0xF0
+        decoded.repeaters ??= [] // set repeaters to empty if none set
+        decoded.frameType ??= 'unnumbered'
+        decoded.pid ??= 0xF0
 
         // if compression is enabled, and the destination is in the cache as supporting compression, use compression if the compressed version is shorter
         let payloadIsCompressed = false
-        if (this.compression && this.getCompressionCache(decodedKissFrame.destinationCallsign, decodedKissFrame.destinationSsid)) {
-            const compressedPayload: string = JSONB.stringify(brotliCompressSync(decodedKissFrame.payload as string))
-            if (compressedPayload.length < (decodedKissFrame.payload as string).length) {
-                decodedKissFrame.payload = compressedPayload
+        if (this.compression && this.getCompressionCache(decoded.destinationCallsign, decoded.destinationSsid)) {
+            const compressedPayload: string = JSONB.stringify(brotliCompressSync(decoded.payload as string))
+            if (compressedPayload.length < (decoded.payload as string).length) {
+                decoded.payload = compressedPayload
                 payloadIsCompressed = true
             }
             else {
@@ -623,72 +589,72 @@ export class KissConnection extends EventEmitter {
             return cn
         }
 
-        let encodedKissFrame: number[] = [] // frame that we will push to and return at the end
+        let encoded: number[] = [] // frame that we will push to and return at the end
 
         // encode the destination callsign, SSID, control bit, and reserved bits
-        encodedKissFrame.push(...encodeCallsign(decodedKissFrame.destinationCallsign))
+        encoded.push(...encodeCallsign(decoded.destinationCallsign))
         let destinationSsidField:string[] = ['1', '1', '1']  // control bit and reserved bits, which are all currently unused on the destination
-        let destSsidBin:string = decodedKissFrame.destinationSsid.toString(2) // get the binary of the destination SSID
+        let destSsidBin:string = decoded.destinationSsid.toString(2) // get the binary of the destination SSID
         while (destSsidBin.length < 4) { // pad it with zeros to a length of 4
             destSsidBin = '0' + destSsidBin
         }
         destinationSsidField.push(destSsidBin) // add padded SSID to field
         destinationSsidField.push('0') // 0 means not the final address, 1 means final address
-        encodedKissFrame.push(parseInt(destinationSsidField.join(''), 2)) // push assembled field to encoded frame
+        encoded.push(parseInt(destinationSsidField.join(''), 2)) // push assembled field to encoded frame
         
         // encode the source callsign, SSID, control bit, and reserved bits
-        encodedKissFrame.push(...encodeCallsign(decodedKissFrame.sourceCallsign))
+        encoded.push(...encodeCallsign(decoded.sourceCallsign))
         let sourceSsidField:string[] = ['0'] // control bit, currently unused
         sourceSsidField.push(this.compression ? '0' : '1') // if compression is enabled, set bit to 0, else set to default of 1
         sourceSsidField.push(payloadIsCompressed ? '0' : '1') // if payload is compressed, set bit to 0, else set to default of 1
-        let srcSsidBin:string = decodedKissFrame.sourceSsid.toString(2) // get the binary representation of the source SSID
+        let srcSsidBin:string = decoded.sourceSsid.toString(2) // get the binary representation of the source SSID
         while (srcSsidBin.length < 4) { // pad it with zeros to a length of 4
             srcSsidBin = '0' + srcSsidBin
         }
         sourceSsidField.push(srcSsidBin) // add padded SSID to field
-        sourceSsidField.push(decodedKissFrame.repeaters.length < 1 ? '1' : '0')  // if no repeaters, push 1 to mark as final address, else push 0 if there's repeaters
-        encodedKissFrame.push(parseInt(sourceSsidField.join(''), 2))  // push assembled field to encoded frame
+        sourceSsidField.push(decoded.repeaters.length < 1 ? '1' : '0')  // if no repeaters, push 1 to mark as final address, else push 0 if there's repeaters
+        encoded.push(parseInt(sourceSsidField.join(''), 2))  // push assembled field to encoded frame
 
         // encode repeaters if the exist
-        if (decodedKissFrame.repeaters.length > 0) {
-            if (decodedKissFrame.repeaters.length > 2) {
-                decodedKissFrame.repeaters = decodedKissFrame.repeaters.slice(0, 2) // truncate if necessary, AX.25 standard states no more than 2 repeaters
+        if (decoded.repeaters.length > 0) {
+            if (decoded.repeaters.length > 2) {
+                decoded.repeaters = decoded.repeaters.slice(0, 2) // truncate if necessary, AX.25 standard states no more than 2 repeaters
             }
-            for (let i = 0; i < decodedKissFrame.repeaters.length; i++) {
-                encodedKissFrame.push(...encodeCallsign(decodedKissFrame.repeaters[i].callsign)) // encode callsign
-                let rsb:string[] = [decodedKissFrame.repeaters[i].hasBeenRepeated ? '1' : '0', '1', '1'] // push hasBeenRepeated bit, and both unused reserved bits
-                let rptSsidBin:string = decodedKissFrame.repeaters[i].ssid.toString(2) // get binary of SSID
+            for (let i = 0; i < decoded.repeaters.length; i++) {
+                encoded.push(...encodeCallsign(decoded.repeaters[i].callsign)) // encode callsign
+                let rsb:string[] = [decoded.repeaters[i].hasBeenRepeated ? '1' : '0', '1', '1'] // push hasBeenRepeated bit, and both unused reserved bits
+                let rptSsidBin:string = decoded.repeaters[i].ssid.toString(2) // get binary of SSID
                 while (rptSsidBin.length < 4) { // pad SSID with zeros to a length of 4
                     rptSsidBin = '0' + rptSsidBin                    
                 }
                 rsb.push(rptSsidBin) // add padded SSID to field
-                rsb.push(i === decodedKissFrame.repeaters.length - 1 ? '1' : '0') // if final repeater, push 1 to mark as final address, else push 0
-                encodedKissFrame.push(parseInt(rsb.join(''), 2))
+                rsb.push(i === decoded.repeaters.length - 1 ? '1' : '0') // if final repeater, push 1 to mark as final address, else push 0
+                encoded.push(parseInt(rsb.join(''), 2))
             }
         }
 
         // TODO: implement supervisory and information frames
-        if (decodedKissFrame.frameType !== 'unnumbered') {
-            console.log(`Encoding ${decodedKissFrame.frameType} frames is not implemented yet, defaulting to unnumbered.`)
+        if (decoded.frameType !== 'unnumbered') {
+            console.log(`Encoding of ${decoded.frameType} frames is not implemented yet, defaulting to unnumbered.`)
         }
-        encodedKissFrame.push(3) // just for the first two bits, leaving poll/final and unnumbered frame modifier bits alone for now
+        encoded.push(3) // just for the first two bits, leaving poll/final and unnumbered frame modifier bits alone for now
 
         // TODO: implement encode PID
-        if (decodedKissFrame.pid !== 0xF0) {
-            console.log(`Layer 3 protocol with PID ${decodedKissFrame.pid} is not implemented yet, defaulting to no layer 3.`)
+        if (decoded.pid !== 0xF0) {
+            console.log(`Layer 3 protocol with PID ${decoded.pid} is not implemented yet, defaulting to no layer 3.`)
         }
-        encodedKissFrame.push(0xF0); // default 240 aka 0xF0
+        encoded.push(0xF0); // default 240 aka 0xF0
         
         // encode payload
-        (decodedKissFrame.payload as string).split('').map((c) => {
-            encodedKissFrame.push(c.charCodeAt(0))
+        (decoded.payload as string).split('').map((c) => {
+            encoded.push(c.charCodeAt(0))
         })
         
         // add header and footer to make AX.25 frame a KISS frame
-        encodedKissFrame.unshift(0x00) // indicates to TNC or software modem that this is a data frame
-        encodedKissFrame.unshift(0xC0) // FEND flag
-        encodedKissFrame.push(0xC0) // FEND flag
-        return encodedKissFrame
+        encoded.unshift(0x00) // indicates to TNC or software modem that this is a data frame
+        encoded.unshift(0xC0) // FEND flag
+        encoded.push(0xC0) // FEND flag
+        return encoded
     }
 
 }

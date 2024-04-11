@@ -1,14 +1,14 @@
 {
-  "name": "kissconnection",
-  "version": "1",
+  "name": "jsax25",
+  "version": ".9",
   "description": "Simple AX.25 Implementation for Packet Radio",
-  "main": "axez.ts",
+  "main": "kissconnection.ts",
   "scripts": {
     "test": "ts-node test.ts"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/taylorsreid/ts-axez.git"
+    "url": "git+https://github.com/taylorsreid/jsax25.git"
   },
   "keywords": [
     "ax25",
@@ -22,17 +22,17 @@
     "radio",
     "hamradio"
   ],
-  "author": "Mike Fuller, Taylor Reid",
-  "license": "MIT",
+  "author": "Taylor Reid",
+  "license": "GPL-3.0-only",
   "bugs": {
-    "url": "https://github.com/taylorsreid/ts-axez/issues"
+    "url": "https://github.com/taylorsreid/jsax25/issues"
   },
   "dependencies": {
     "json-buffer": "^3.0.1",
     "node-localstorage": "^3.0.5",
     "serialport": "latest"
   },
-  "homepage": "https://github.com/taylorsreid/ts-axez#readme",
+  "homepage": "https://github.com/taylorsreid/jsax25#readme",
   "devDependencies": {
     "@types/json-buffer": "^3.0.2",
     "@types/lodash": "^4.17.0",

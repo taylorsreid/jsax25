@@ -2,19 +2,11 @@ import { KissOutput, KissConnection, Repeater, KissConnectionConstructor, Serial
 import { isEqual } from 'lodash'
 
 // ******************** SET YOUR TEST VARIABLES BELOW ********************
-const MY_CALLSIGN:string = 'KO4LCM'
+const MY_CALLSIGN:string = 'N0CALL'
 const MY_SSID:number = 0
-const THEIR_CALLSIGN:string = 'KO4LCM'
+const THEIR_CALLSIGN:string = 'N0CALL'
 const THEIR_SSID:number = 1
 const CONSTRUCTOR:KissConnectionConstructor = {
-	callsign: MY_CALLSIGN,
-    ssid: MY_SSID,
-    // serialPort: 'COM5',
-    // serialBaud: 9600,
-    // tcpHost: '127.0.0.1',
-    // tcpPort: 8100,
-    // filterByCallsign: false,
-    // filterBySsid: false,
     compression: true
 }
 
@@ -58,8 +50,6 @@ const SERIALIZABLE_ARRAY:TestObject[] = [
 	}
 ]
 
-// ******************** SET WHICH FRAME TYPE TO USE BY COMMENTING OUT THE REST ********************
-
 // simplex
 const testFrame:KissInput = {
 	sourceCallsign: MY_CALLSIGN,
@@ -70,43 +60,7 @@ const testFrame:KissInput = {
 	repeaters: [] as Repeater[],
 }
 
-// // using digipeaters
-// const testFrame = {
-// 	source: YOUR_CALLSIGN,
-// 	sourceSsid: YOUR_SSID,
-// 	destination: THEIR_CALLSIGN,
-// 	destinationSsid: THEIR_SSID,
-// 	message: MESSAGE,
-// 	repeaters: [
-// 		{ callsign: "NOCALL", ssid: 0 },
-// 		{ callsign: "NOCALL", ssid: 3 },
-// 		{ callsign: "NOCALL", ssid: 4 },
-// 		{ callsign: "NOCALL", ssid: 15 }
-// 	],
-// 	aprs: false
-// }
-
-// using APRS
-// const testFrame:DecodedKissFrame = {
-// 	sourceCallsign: MY_CALLSIGN,
-// 	sourceSsid: MY_SSID,
-// 	destinationCallsign: THEIR_CALLSIGN,
-// 	destinationSsid: THEIR_SSID,
-// 	payload: `:${MY_CALLSIGN}-${MY_SSID}:${STRING}`,
-// 	repeaters: [
-// 		{
-// 			callsign: "WIDE1",
-// 			ssid: 1,
-// 			hasBeenRepeated: true
-// 		},
-// 		{
-// 			callsign: "WIDE2",
-// 			ssid: 2,
-// 			hasBeenRepeated: true
-// 		}
-// 	],
-// 	frameType: 'information'
-// }
+//TODO: APRS and digipeater implementation and testing
 
 // ******************** SET WHICH TESTS TO RUN BY COMMENTING OUT LINES ********************
 
@@ -115,9 +69,8 @@ const testFrame:KissInput = {
 
 // tests that require a radio
 // createConnectionTest()
-// sendTest()
 listenTest()
-// listenFilteredTest()
+// sendTest()
 // listenAndRespondTest()
 // sendAndListenTest()
 
@@ -129,9 +82,9 @@ function encodeDecodeTest() {
 		try {
 			let original:KissInput = {
 				sourceCallsign: MY_CALLSIGN,
-				sourceSsid: 0,
-				destinationCallsign: MY_CALLSIGN,
-				destinationSsid: 1,
+				sourceSsid: MY_SSID,
+				destinationCallsign: THEIR_CALLSIGN,
+				destinationSsid: THEIR_SSID,
 				payload: testable.value
 			}
 			let originalCopy = structuredClone(original) // MUST USE STRUCTUREDCLONE OTHERWISE THE ORIGINAL IS MUTATED AND THE TEST FAILS
@@ -140,7 +93,6 @@ function encodeDecodeTest() {
 
 			if (isEqual(original.payload, decoded.payload)) {
 				console.log(`\tTesting if received and original ${testable.type}s match... \x1b[32mPASS\x1b[0m`)
-				console.log(decoded)
 			}
 			else {
 				console.log(`\tTesting if received and original ${testable.type} match... \x1b[31mFAIL\x1b[0m`)
@@ -182,6 +134,32 @@ function createConnectionTest() {
 	}
 }
 
+function listenTest() {
+	console.log('Testing listening...')
+	try {
+		const kissConnection = new KissConnection(CONSTRUCTOR)
+		if (kissConnection.isSerial()) {
+			console.log(`\tListening on ${kissConnection.getSerialPort()} at ${kissConnection.getSerialBaud()} baud...`)
+		}
+		else if (kissConnection.isTcp()) {
+			console.log(`\tListening on ${kissConnection.getTcpHost()}:${kissConnection.getTcpPort()}...`)
+		}
+		kissConnection.on('data', (decodedFrame:KissOutput) => {
+			console.log(decodedFrame)
+		})
+	}
+	catch (error) {
+		if (error instanceof ReferenceError) {
+			console.log('\tConnection test failed, aborting receive test... \x1b[33mWARNING\x1b[0m')
+		}
+		else {
+			console.log('\tListening test... \x1b[31mFAIL\x1b[0m')
+			console.log(error)
+		}
+		
+	}
+}
+
 function sendTest() {
 	console.log('Testing sending data...')
 	console.time('\tsendTest')
@@ -209,8 +187,9 @@ function sendTest() {
 	}
 }
 
-function listenTest() {
-	console.log('Testing listening...')
+function listenAndRespondTest() {
+	console.log('Testing listening and responding...')
+	console.time('\tlistenAndRespondTest')
 	try {
 		const kissConnection = new KissConnection(CONSTRUCTOR)
 		if (kissConnection.isSerial()) {
@@ -220,8 +199,23 @@ function listenTest() {
 			console.log(`\tListening on ${kissConnection.getTcpHost()}:${kissConnection.getTcpPort()}...`)
 		}
 		kissConnection.on('data', (decodedFrame:KissOutput) => {
+			console.log('\tReceived: ')
 			console.log(decodedFrame)
+			console.log('\t\x1b[33mWARNING:\x1b[0m You must manually verify that this frame meets what you expected.')
+			const response:KissInput = {
+				sourceCallsign: MY_CALLSIGN,
+				sourceSsid:MY_SSID,
+				destinationCallsign: decodedFrame.sourceCallsign,
+				destinationSsid: decodedFrame.sourceSsid,
+				payload: 'ACKNOWLEDGED',
+			}
+			console.log(`\tSending response ${JSON.stringify(response)}`)
+			kissConnection.send(response)
+			console.log('\tSending response... \x1b[32mPASS\x1b[0m')
+			kissConnection.close()
+			console.timeEnd('\tlistenAndRespondTest')
 		})
+		
 	}
 	catch (error) {
 		if (error instanceof ReferenceError) {
@@ -229,101 +223,28 @@ function listenTest() {
 		}
 		else {
 			console.log('\tListening test... \x1b[31mFAIL\x1b[0m')
-			console.log(error)
 		}
-		
+		console.timeEnd('\tlistenAndRespondTest')
 	}
 }
 
-// function listenFilteredTest() {
-// 	console.log('Testing filtering...')
-// 	console.time('\tlistenFilteredTest')
-// 	try {
-// 		const kissConnection = new KissConnection(CONSTRUCTOR)
-// 		kissConnection.on('callsignSsid', (f:DecodedKissFrame) => {
-// 			if (typeof f !== 'undefined') { // guard against undefined
-// 				if (f.destinationCallsign === MY_CALLSIGN && f.destinationSsid === MY_SSID) {
-// 					console.log(`\tTesting if filtering works... \x1b[32mPASS\x1b[0m`)
-// 				}
-// 				else {
-// 					console.log('\tTesting if filtering works... \x1b[31mFAIL\x1b[0m')
-// 					console.log(`Packet callsign: ${f.destinationCallsign}`)
-// 					console.log(`Your callsign: ${MY_CALLSIGN}`)
-// 					console.log(`Packet SSID: ${f.destinationSsid}`)
-// 					console.log(`Your SSID: ${MY_SSID}`)
-// 				}
-// 			}
-// 		})
-// 	}
-// 	catch (error) {
-// 		if (error instanceof ReferenceError) {
-// 			console.log('\tConnection test failed, aborting receive test... \x1b[33mWARNING\x1b[0m')
-// 		}
-// 		else {
-// 			console.log('\tListening test... \x1b[31mFAIL\x1b[0m')
-// 		}
-// 		console.timeEnd('\tlistenFilteredTest')
-// 	}
-	
-// }
-
-// function listenAndRespondTest() {
-// 	console.log('Testing listening and responding...')
-// 	console.time('\tlistenAndRespondTest')
-// 	try {
-// 		const kissConnection = new KissConnection(CONSTRUCTOR)
-// 		if (kissConnection.isSerial()) {
-// 			console.log(`\tListening on ${kissConnection.getSerialPort()} at ${kissConnection.getSerialBaud()} baud...`)
-// 		}
-// 		else if (kissConnection.isTcp()) {
-// 			console.log(`\tListening on ${kissConnection.getTcpHost()}:${kissConnection.getTcpPort()}...`)
-// 		}
-// 		kissConnection.on('callsignSsid', (decodedFrame:DecodedKissFrame) => {
-// 			console.log
-// 			console.log('\tReceived: ')
-// 			console.log(decodedFrame)
-// 			console.log('\t\x1b[33mWARNING:\x1b[0m You must manually verify that this frame meets what you expected.')
-// 			const response:DecodedKissFrame = {
-// 				destinationCallsign: decodedFrame.sourceCallsign,
-// 				destinationSsid: decodedFrame.sourceSsid,
-// 				payload: 'ACKNOWLEDGED',
-// 				frameType: 'information'
-// 			}
-// 			kissConnection.send(response)
-// 			console.log(`\tSending response ${JSON.stringify(response)}`)
-// 			console.log('\tSending response... \x1b[32mPASS\x1b[0m')
-// 			kissConnection.close()
-// 			console.timeEnd('\tlistenAndRespondTest')
-// 		})
-		
-// 	}
-// 	catch (error) {
-// 		if (error instanceof ReferenceError) {
-// 			console.log('\tConnection test failed, aborting receive test... \x1b[33mWARNING\x1b[0m')
-// 		}
-// 		else {
-// 			console.log('\tListening test... \x1b[31mFAIL\x1b[0m')
-// 		}
-// 		console.timeEnd('\tlistenAndRespondTest')
-// 	}
-// }
-
-// function sendAndListenTest() {
-// 	console.log('Testing sending and listening...')
-// 	console.time('\tlistenAndRespondTest')
-// 	try {
-// 		const kissConnection = new KissConnection(CONSTRUCTOR)
-// 		if (kissConnection.isSerial()) {
-// 			console.log(`\tSending on ${kissConnection.getSerialPort()} at ${kissConnection.getSerialBaud()} baud...`)
-// 		}
-// 		else if (kissConnection.isTcp()) {
-// 			console.log(`\tSending on ${kissConnection.getTcpHost()}:${kissConnection.getTcpPort()}...`)
-// 		}
-// 		kissConnection.send(testFrame)
-// 		kissConnection.on('callsignSsid', (decodedFrame:KissFrameWithSource) => {
-// 			console.log('\tSend and listen test... \x1b[32mPASS\x1b[0m')
-// 		})
-// 	} catch (error) {
-// 		console.log('\tSend and listen test... \x1b[31mFAIL\x1b[0m')
-// 	}
-// }
+function sendAndListenTest() {
+	console.log('Testing sending and listening...')
+	console.time('\tlistenAndRespondTest')
+	try {
+		const kissConnection = new KissConnection(CONSTRUCTOR)
+		if (kissConnection.isSerial()) {
+			console.log(`\tSending on ${kissConnection.getSerialPort()} at ${kissConnection.getSerialBaud()} baud...`)
+		}
+		else if (kissConnection.isTcp()) {
+			console.log(`\tSending on ${kissConnection.getTcpHost()}:${kissConnection.getTcpPort()}...`)
+		}
+		kissConnection.send(testFrame)
+		kissConnection.on('data', (decodedFrame:KissOutput) => {
+			console.log(decodedFrame)
+			console.log('\tSend and listen test... \x1b[32mPASS\x1b[0m')
+		})
+	} catch (error) {
+		console.log('\tSend and listen test... \x1b[31mFAIL\x1b[0m')
+	}
+}
