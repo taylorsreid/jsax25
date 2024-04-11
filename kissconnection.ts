@@ -9,11 +9,11 @@ import { LocalStorage } from 'node-localstorage'
 export interface Repeater {
     callsign: string,
     ssid: number,
-    hasBeenRepeated: boolean
+    hasBeenRepeated?: boolean
 }
 
 // not exported because the goal is for the user to never have to deal with encoded packets
-interface EncodedKissFrame extends Iterable<number> { }
+export interface EncodedKissFrame extends Iterable<number> { }
 
 /** Any type of data that can be serialized and sent over AX.25 / AFSK */
 export type Serializable = string | number | JSON | Object | string[] | number[] | JSON[] | Object[] | Serializable[] // not sure about this last one
@@ -177,10 +177,13 @@ export class KissConnection extends EventEmitter {
         }
 
         // attach event listener upon object instantiation
-        this.conn.on('data', (data) => {
+        this.conn.on('data', (data:EncodedKissFrame) => {
 
-            // emit the data to the unfiltered channel in case the dev wants to listen for both data addressed to them and not addressed to them
-            this.emit('data', this.decode(data))
+            // emit raw
+            this.emit('raw', data)
+
+            // emit decoded
+            this.emit('data', this.decode(data))            
 
             //TODO: implement resending if supervisory frame is requesting it
             // if (decodedFrame.frameType === 'supervisory') {
@@ -554,6 +557,11 @@ export class KissConnection extends EventEmitter {
             decoded.sourceCallsign += ' ' // pad callsign with spaces if it's under spec length
         }
         decoded.sourceSsid ??= 0
+
+        // set each repeater to has not been repeated if it's not defined
+        decoded.repeaters.map((r) => {
+            r.hasBeenRepeated ??= false
+        })
 
         // stringify if it isn't a string already
         if (typeof decoded.payload !== 'string') {
