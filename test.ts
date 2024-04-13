@@ -1,4 +1,4 @@
-import { KissOutput, KissConnection, Repeater, KissConnectionConstructor, Serializable, KissInput } from "./kissconnection";
+import { KissOutput, KissConnection, Repeater, KissConnectionConstructor, KissInput } from "./kissconnection";
 import { isEqual } from 'lodash'
 
 // ******************** SET YOUR TEST VARIABLES BELOW ********************
@@ -20,7 +20,7 @@ const OBJECT_ARRAY:Object[] = [OBJECT, OBJECT, OBJECT]
 
 interface TestObject {
 	type: string,
-	value: Serializable
+	value: any
 }
 // an array of each kind to test with a type tag
 const SERIALIZABLE_ARRAY:TestObject[] = [
@@ -64,12 +64,12 @@ const testFrame:KissInput = {
 
 // ******************** SET WHICH TESTS TO RUN BY COMMENTING OUT LINES ********************
 
-// tests that don't require a radio
-// encodeDecodeTest()
-
-// tests that require a radio
+// requires a radio to connect to, but does not receive or transmit
+encodeDecodeTest()
 // createConnectionTest()
-listenTest()
+
+// requires a radio and receive and/or transmit capabilities
+// listenTest()
 // sendTest()
 // listenAndRespondTest()
 // sendAndListenTest()
@@ -78,8 +78,8 @@ listenTest()
 function encodeDecodeTest() {
 	console.log('Testing encode and decode methods...')
 	SERIALIZABLE_ARRAY.map((testable:TestObject) => {
-		const kissConnection = new KissConnection(CONSTRUCTOR)
 		try {
+			const kissConnection = new KissConnection(CONSTRUCTOR)
 			let original:KissInput = {
 				sourceCallsign: MY_CALLSIGN,
 				sourceSsid: MY_SSID,
@@ -89,8 +89,8 @@ function encodeDecodeTest() {
 			}
 			let originalCopy = structuredClone(original) // MUST USE STRUCTUREDCLONE OTHERWISE THE ORIGINAL IS MUTATED AND THE TEST FAILS
 			let decoded = kissConnection.decode(kissConnection.encode(originalCopy))
+			kissConnection.close()
 			console.log(`\n\tEncoding and decoding a ${testable.type}... \x1b[32mPASS\x1b[0m`)
-
 			if (isEqual(original.payload, decoded.payload)) {
 				console.log(`\tTesting if received and original ${testable.type}s match... \x1b[32mPASS\x1b[0m`)
 			}

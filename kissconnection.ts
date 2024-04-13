@@ -12,11 +12,10 @@ export interface Repeater {
     hasBeenRepeated?: boolean
 }
 
-// not exported because the goal is for the user to never have to deal with encoded packets
+/**
+ * An encoded AX.25 frame in KISS format.
+ */
 export interface EncodedKissFrame extends Iterable<number> { }
-
-/** Any type of data that can be serialized and sent over AX.25 / AFSK */
-export type Serializable = string | number | JSON | Object | string[] | number[] | JSON[] | Object[] | Serializable[] // not sure about this last one
 
 /**
  * @attribute destinationCallsign: string - The destination amateur radio callsign.
@@ -27,7 +26,7 @@ export type Serializable = string | number | JSON | Object | string[] | number[]
  * @attribute sourceCommand: boolean - Whether the frame is a command frame from the source or not. Must be opposite of destinationCommand.
  * @attribute sourceAcceptsCompression: boolean - If the sender is using this library, indicates whether they support compression using the Brotli algorithm.
  * @attribute payloadIsCompressed: boolean - If the sender is using this library, indicates whether the payload is compressed or not. The payload is not always compressed even if compression is enabled, for instance if the compressed version is longer than the uncompressed version.
- * @attribute payload: Serializable - The payload/body of your packet frame. Can be of multiple different types, see exported Serializable interface for exact allowed types.
+ * @attribute payload: any - The payload/body of your packet frame. Can be anything serializable, ex. a string, number, JSON, etc.
  * @attribute repeaters: Repeater[] - The repeater path you wish to use in sending the packet, or the path that the packet was received on. Default none if not defined.
  * @attribute frametype: 'information'|'supervisory'|'unnumbered' - The frame type being sent. Default and most common is 'unnumbered'.
  * @attribute pid: number - The PID indicates which layer 3 protocol is in use, default is 240 which is none.
@@ -51,8 +50,8 @@ export interface KissOutput {
      * The payload is not always compressed even if compression is enabled, 
      * for instance if the compressed version is longer than the uncompressed version. */
     payloadIsCompressed: boolean,
-    /** The payload/body of your packet frame. Can be of multiple different types, see exported Serializable interface for exact allowed types. */
-    payload: Serializable,
+    /** The payload/body of your packet frame. Can be anything serializable, ex. a string, number, JSON, etc */
+    payload: any,
     /** The repeater path you wish to use in sending the packet, or the path that the packet was received on. Default none if not defined. */
     repeaters: Repeater[],
     /** Which of the allowed frame types the frame is, unnumbered is the most common in APRS and is the default. */
@@ -66,7 +65,7 @@ export interface KissOutput {
  * @attribute destinationSsid?: number - The destination's SSID. Default 0 if not defined.
  * @attribute sourceCallsign: string - The sender's amateur radio callsign.
  * @attribute sourceSsid?: number - The sender's SSID. Default 0 if not defined.
- * @attribute payload: Serializable - The payload/body of your packet frame. Can be of multiple different types, see exported Serializable interface for exact allowed types.
+ * @attribute payload: any - The payload/body of your packet frame. Can be anything serializable, ex. a string, number, JSON, etc.
  * @attribute repeaters?: Repeater[] - The repeater path you wish to use in sending the packet, or the path that the packet was received on. Default none if not defined.
  * @attribute frametype?: 'information'|'supervisory'|'unnumbered' - The frame type being sent. Default and most common is 'unnumbered'.
  * @attribute pid?: number - The PID indicates which layer 3 protocol is in use, default is 240 which is none.
