@@ -24,7 +24,7 @@ There's a multitude of constructor options that you can use:
     })
 
     // A more complex example, a serial connection with a custom baud rate, Brotli compression enabled, and connection errors suppressed.
-    //You can use different combinations together, except for serialPort and tcp options, you must pick one.
+    // You can use different combinations together, except for serialPort, tcp, and nullModem options, you must pick one.
     const conn = new KissConnection({
 
         serialPort: 'COM2',
@@ -38,6 +38,11 @@ There's a multitude of constructor options that you can use:
                            // and packets may still be sent uncompressed if the compression effect isn't significant.
 
         suppressConnectionErrors: true //useful if you are building a CLI app like a BBS and want to handle errors on your own without them being printed to the console.
+    })
+
+    // You can also initialize a dummy modem that just outputs to the console when you call the send method. This is useful for testing your application's behavior without actually sending anything over the air:
+    const conn = new KissConnection({
+        nullModem: true // setting this to true overrides all serial and TCP settings
     })
 
 ### Create an encoded packet
@@ -56,7 +61,7 @@ There's a multitude of constructor options that you can use:
     }
 
 ### Send a packet
-    conn.send(myFrame) // encodes and sends packet immediately
+    conn.send(myFrame) // encodes and sends packet immediately, if nullModem is set to true then just outputs to the console without sending
     conn.send([myFrame, myFrame]) // also accepts an array of unencoded packets, encodes them and sends them upon finishing encoding all of them.
 
 ### Manual encoding and sending of packets (optional, not reccomended)

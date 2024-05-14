@@ -695,7 +695,7 @@ class NullModem {
     }
 
     public write(buffer: string | Uint8Array, cb?: (err?: Error) => void): boolean | void {
-        console.log(`NullModem.write(): ${buffer}`)
+        console.log(`NullModem.write(): [ ${buffer} ]`)
     }
 
     public end() {
