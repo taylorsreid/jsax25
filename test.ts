@@ -64,11 +64,13 @@ const testFrame:KissInput = {
 
 // ******************** SET WHICH TESTS TO RUN BY COMMENTING OUT LINES ********************
 
-// requires a radio to connect to, but does not receive or transmit
+// these tests do not require a radio
 encodeDecodeTest()
-// createConnectionTest()
+createConnectionTest({nullModem: true})
+sendTest({nullModem: true})
 
-// requires a radio and receive and/or transmit capabilities
+// these tests require a radio
+// createConnectionTest()
 // listenTest()
 // sendTest()
 // listenAndRespondTest()
@@ -77,9 +79,10 @@ encodeDecodeTest()
 // ******************** ACTUAL TEST FUNCTIONS ********************
 function encodeDecodeTest() {
 	console.log('Testing encode and decode methods...')
+	console.time('\tEncodeDecodeTest')
 	SERIALIZABLE_ARRAY.map((testable:TestObject) => {
 		try {
-			const kissConnection = new KissConnection(CONSTRUCTOR)
+			const kissConnection = new KissConnection({nullModem: true})
 			let original:KissInput = {
 				sourceCallsign: MY_CALLSIGN,
 				sourceSsid: MY_SSID,
@@ -106,14 +109,20 @@ function encodeDecodeTest() {
 			console.log(error)
 		}
 	})
+	console.log()
+	console.timeEnd('\tEncodeDecodeTest')
 }
 
-function createConnectionTest() {
+function createConnectionTest(constructor?: KissConnectionConstructor) {
 	console.log(`Testing creating a connection...`)
 	console.time('\tcreateConnectionTest')
 	try {
-		const kissConnection = new KissConnection(CONSTRUCTOR)
-		if (kissConnection.isSerial()) {
+		constructor ??= CONSTRUCTOR // set to default if arg not defined
+		const kissConnection = new KissConnection(constructor)
+		if (kissConnection.isNullModem()) {
+			console.log('\tCreating a NullModem test connection... \x1b[32mPASS\x1b[0m')
+		}
+		else if (kissConnection.isSerial()) {
 			console.log(`\tCreating a ${kissConnection.getSerialBaud()} baud connection on ${kissConnection.getSerialPort()}.... \x1b[32mPASS\x1b[0m`)
 		}
 		else if (kissConnection.isTcp()) {
@@ -126,12 +135,11 @@ function createConnectionTest() {
 			console.log(`\tSomething else went wrong... \x1b[31mFAIL\x1b[0m`)
 		}
 		kissConnection.close()
-		console.timeEnd('\tcreateConnectionTest')
 	}
 	catch (error) {
 		console.log('\tCreating connection... \x1b[31mFAIL\x1b[0m')
-		console.timeEnd('\tcreateConnectionTest')
 	}
+	console.timeEnd('\tcreateConnectionTest')
 }
 
 function listenTest() {
@@ -160,21 +168,23 @@ function listenTest() {
 	}
 }
 
-function sendTest() {
+function sendTest(constructor?: KissConnectionConstructor) {
 	console.log('Testing sending data...')
 	console.time('\tsendTest')
 	try {
-		const kissConnection = new KissConnection(CONSTRUCTOR)
-		if (kissConnection.isSerial()) {
-			kissConnection.send(testFrame)
+		constructor ??= CONSTRUCTOR
+		const kissConnection = new KissConnection(constructor)
+		kissConnection.send(testFrame)
+		if (kissConnection.isNullModem()) {
+			console.log('\tSending data to test NullModem... \x1b[32mPASS\x1b[0m')
+		}
+		else if (kissConnection.isSerial()) {
 			console.log(`\tSending data to ${kissConnection.getSerialPort()} at ${kissConnection.getSerialBaud()} baud.... \x1b[32mPASS\x1b[0m`)
 		}
 		else if (kissConnection.isTcp()) {
-			kissConnection.send(testFrame)
 			console.log(`\tSending data to ${kissConnection.getTcpHost()}:${kissConnection.getTcpPort()}... \x1b[32mPASS\x1b[0m`)
 		}
 		kissConnection.close()
-		console.timeEnd('\tsendTest')
 	}
 	catch(error) {
 		if (error instanceof ReferenceError) {
@@ -183,8 +193,8 @@ function sendTest() {
 		else {
 			console.log('\tSend test... \x1b[31mFAIL\x1b[0m')
 		}
-		console.timeEnd('\tsendTest')
 	}
+	console.timeEnd('\tsendTest')
 }
 
 function listenAndRespondTest() {
@@ -213,7 +223,6 @@ function listenAndRespondTest() {
 			kissConnection.send(response)
 			console.log('\tSending response... \x1b[32mPASS\x1b[0m')
 			kissConnection.close()
-			console.timeEnd('\tlistenAndRespondTest')
 		})
 		
 	}
@@ -224,8 +233,8 @@ function listenAndRespondTest() {
 		else {
 			console.log('\tListening test... \x1b[31mFAIL\x1b[0m')
 		}
-		console.timeEnd('\tlistenAndRespondTest')
 	}
+	console.timeEnd('\tlistenAndRespondTest')
 }
 
 function sendAndListenTest() {
@@ -247,4 +256,5 @@ function sendAndListenTest() {
 	} catch (error) {
 		console.log('\tSend and listen test... \x1b[31mFAIL\x1b[0m')
 	}
+	console.timeEnd('\tlistenAndRespondTest')
 }

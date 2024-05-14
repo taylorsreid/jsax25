@@ -82,22 +82,25 @@ export interface KissInput extends Omit<KissOutput, 'destinationCommand' | 'sour
  * @attribute tcpHost?: string - The IP address or URL to your TNC or software mode. Default '127.0.0.1' (most common) if not defined.
  * @attribute tcpPort?: number - The TCP port to your TNC or software modem. Default 8100 (most common) if not defined.
  * @attribute compression?: boolean - Enable optional compression of the payload/body portion of the packet using the brotli algorithm. Callsigns and SSIDs are not compressed in the spirit of amateur radio. Note that regardless of setting, if for some reason the compressed version is larger than the uncompressed version, the uncompressed version is sent. Default false if not defined.
- * @attribute suppressConnectionErrors:? boolean - Mostly used for development and debugging. SerialPort and Socket will by default print errors to the console, set this to true to disable them. Default false if not defined.
+ * @attribute suppressConnectionErrors?: boolean - Mostly used for development and debugging. SerialPort and Socket will by default print errors to the console, set this to true to disable them. Default false if not defined.
+ * @attribute nullModem?: boolean - A fake modem for running tests without a radio. Anything written to it will simply be printed to the console. Setting this to true overrides any and all serial and TCP options. Default to false if not defined.
  */
 
 export interface KissConnectionConstructor {
     /** The path to your TNC or software modem's serial port. If defined, it will override any TCP options that you include. Leave blank to use TCP.  No default. */
     serialPort?: string,
     /** A custom baud rate for your TNC or software modem's serial port. Default 1200 (most common) if not defined. */
-    serialBaud?: number
+    serialBaud?: number,
     /** The IP address or URL to your TNC or software mode. Default '127.0.0.1' (most common) if not defined. */
     tcpHost?: string,
     /** The TCP port to your TNC or software modem. Default 8100 (most common) if not defined. */
     tcpPort?: number,
     /** Enable optional compression of the payload/body portion of the packet using the brotli algorithm. Callsigns and SSIDs are not compressed in the spirit of amateur radio. Note that regardless of setting, if for some reason the compressed version is larger than the uncompressed version, the uncompressed version is sent. Default false if not defined. */
-    compression?: boolean
+    compression?: boolean,
     /** SerialPort and Socket will by default print errors to the console, set this to true to disable them. Default false if not defined. */
-    suppressConnectionErrors?: boolean
+    suppressConnectionErrors?: boolean,
+    /** A fake modem for running tests without a radio. Anything written to it will simply be printed to the console. Setting this to true overrides any and all serial and TCP options. Default to false if not defined. */
+    nullModem?: boolean
 }
 
 /**
@@ -110,13 +113,14 @@ export interface KissConnectionConstructor {
  * On receive, emits events like the SerialPort, Socket, and EventEmitter classes, you can listen for incoming data with the instance's on('data', (decodedPacket) => {//do stuff}) method, 
  */
 export class KissConnection extends EventEmitter {
-    private conn: SerialPort | Socket
+    private conn: SerialPort | Socket | NullModem
     private serialPort: string
     private serialBaud: number
     private tcpHost: string
     private tcpPort: number
     private compression: boolean
     private suppressConnectionErrors: boolean
+    private nullModem: boolean
     private compressionCache = new LocalStorage('./compressionCache')
 
     /**
@@ -126,14 +130,16 @@ export class KissConnection extends EventEmitter {
      * @attribute tcpPort?: number - The TCP port to your TNC or software modem. Default 8100 (most common) if not defined.
      * @attribute compression?: boolean - Enable optional compression of the payload/body portion of the packet using the brotli algorithm. Callsigns and SSIDs are not compressed in the spirit of amateur radio. Note that regardless of setting, if for some reason the compressed version is larger than the uncompressed version, the uncompressed version is sent. Default false if not defined.
      * @attribute suppressConnectionErrors:? boolean - SerialPort and Socket will by default print errors to the console, set this to true to disable them. Default false if not defined.
+     * @attribute nullModem?: boolean - A fake modem for running tests without a radio. Anything written to it will simply be printed to the console. Setting this to true overrides any and all serial and TCP options. Default to false if not defined.
      */
     constructor(options?: {
         serialPort?: string,
-        serialBaud?: number
+        serialBaud?: number,
         tcpHost?: string,
         tcpPort?: number,
-        compression?: boolean
-        suppressConnectionErrors?: boolean
+        compression?: boolean,
+        suppressConnectionErrors?: boolean,
+        nullModem?: boolean
     }) {
 
         super()
@@ -146,6 +152,7 @@ export class KissConnection extends EventEmitter {
             this.tcpPort = options.tcpPort ?? 8100
             this.compression = options.compression ?? false
             this.suppressConnectionErrors = options.suppressConnectionErrors ?? false
+            this.nullModem = options.nullModem ?? false
         }
         else {
             this.tcpHost = '127.0.0.1'
@@ -154,9 +161,10 @@ export class KissConnection extends EventEmitter {
             this.suppressConnectionErrors = false
         }
         
-
-        // if serial connection selected, create. else create tcp
-        if (this.serialPort) {
+        if (this.nullModem) {
+            this.conn = new NullModem()
+        }
+        else if (this.serialPort) {
             this.conn = new SerialPort({
                 path: this.serialPort,
                 baudRate: this.serialBaud,
@@ -266,10 +274,17 @@ export class KissConnection extends EventEmitter {
     }
 
     /**
+     * Check if the current connection a NullModem test.
+     */
+    public isNullModem(): boolean {
+        return this.conn instanceof NullModem
+    }
+
+    /**
      * Get the current connection in use to manage manually.
      * @returns a configured SerialPort or Socket instance.
      */
-    public getConnection(): SerialPort | Socket {
+    public getConnection(): SerialPort | Socket | NullModem {
         return this.conn
     }
 
@@ -668,5 +683,22 @@ export class KissConnection extends EventEmitter {
         encoded.unshift(0xC0) // FEND flag
         encoded.push(0xC0) // FEND flag
         return encoded
+    }
+}
+
+class NullModem {
+
+    public closed: boolean = false
+
+    public on(event: string, listener: any) {
+        
+    }
+
+    public write(buffer: string | Uint8Array, cb?: (err?: Error) => void): boolean | void {
+        console.log(`NullModem.write(): ${buffer}`)
+    }
+
+    public end() {
+        this.closed = true
     }
 }
