@@ -9,7 +9,7 @@ import { isEqual } from 'lodash';
 // "type" must be included for Bun compatibility, using Bun version 1.1.10 as of writing
 import { type Repeater } from './repeater';
 import { type EncodedKissFrame } from './encodedkissframe';
-import { type DecodedKissFrame } from './decodedkissframe';
+import { type BaseKissFrame } from './decodedkissframe';
 import { type ListenFilter } from './listenfilter';
 import { type KissConnectionConstructor } from './kissconnectionconstructor';
 import { type Address } from './address';
@@ -17,10 +17,15 @@ import { type Address } from './address';
 // // re-export from index for better import organization by library users
 export { type Repeater } from './repeater'
 export { type EncodedKissFrame } from './encodedkissframe';
-export { type DecodedKissFrame } from './decodedkissframe';
+export { type BaseKissFrame as DecodedKissFrame } from './decodedkissframe';
 export { type ListenFilter } from './listenfilter';
 export { type KissConnectionConstructor } from './kissconnectionconstructor';
 export { type Address } from './address';
+
+interface CacheItem {
+    supportsCompression: boolean,
+    module?: 8|128
+}
 
 /**
  * A SerialPort/Socket connection to a TNC or software modem that encodes, compresses (optional), sends, receives, decodes, decompresses (if necessary), and emits AX.25 packets for amateur radio use.
@@ -40,6 +45,7 @@ export class KissConnection extends EventEmitter {
     private compression: boolean
     private suppressConnectionErrors: boolean
     private nullModem: boolean
+    private callsignCache: LocalStorage = new LocalStorage('./callsignCache')
 
     /**
      * @attribute serialPort?: string - The path to your TNC or software modem's serial port. If defined, it will override any TCP options that you include. Leave blank to use TCP. No default.
@@ -200,7 +206,7 @@ export class KissConnection extends EventEmitter {
      * This method can be called multiple times to listen to multiple different filters simultaneously.
      * @returns the KissConnection instance for method chaining.
      */
-    public listen(callback: (data: DecodedKissFrame) => void, filter?: ListenFilter): this {
+    public listen(callback: (data: BaseKissFrame) => void, filter?: ListenFilter): this {
         this.conn.on('data', (data: EncodedKissFrame) => {
             if (filter) {
 
@@ -247,12 +253,12 @@ export class KissConnection extends EventEmitter {
 
                 // compare the filter criteria with what has been decoded, and if it passes call the callback
                 if (isEqual(filter, decoded)) {
-                    callback(KissConnection.decode(data))
+                    callback(this.decode(data))
                 }
 
             }
             else {
-                callback(KissConnection.decode(data))
+                callback(this.decode(data))
             }
         })
         return this
@@ -263,7 +269,7 @@ export class KissConnection extends EventEmitter {
      * @param decodedFrame a single KissInput object or an array of them.
      * @returns this KissConnection instance for method chaining.
      */
-    public send(decodedFrameOrFrames: DecodedKissFrame | DecodedKissFrame[]): this {
+    public send(decodedFrameOrFrames: BaseKissFrame | BaseKissFrame[]): this {
 
         // remind user that they're in a test mode
         if (this.nullModem) {
@@ -277,7 +283,7 @@ export class KissConnection extends EventEmitter {
 
             // encode each frame
             decodedFrameOrFrames.forEach((f) => {
-                encodedFrames.push(KissConnection.encode(f, this.compression))
+                encodedFrames.push(this.encode(f))
             });
 
             // send each frame
@@ -287,7 +293,7 @@ export class KissConnection extends EventEmitter {
         }
         // if single frame, encode and send
         else {
-            this.conn.write(new Uint8Array(KissConnection.encode(decodedFrameOrFrames, this.compression))) // validate and repair if necessary, then encode and send
+            this.conn.write(new Uint8Array(this.encode(decodedFrameOrFrames))) // validate and repair if necessary, then encode and send
         }
 
         // return this for method chaining
@@ -300,8 +306,8 @@ export class KissConnection extends EventEmitter {
      * @param ssid the callsign's SSID to store, an operator may have devices that do not support the custom compression of this class, so it's important to store them with SSID.
      * @param supportsCompression boolean value whether the callsign + SSID combo supports this class' custom Brotli compression algorithm.
      */
-    private static setCompressionCache(callsign: string, ssid: number, supportsCompression: boolean): void {
-        new LocalStorage('./compressionCache').setItem(callsign + '-' + ssid, `${supportsCompression}`)
+    private setCallsignCache(callsign: string, ssid: number, details: CacheItem): void {
+        this.callsignCache.setItem(callsign + '-' + ssid, JSON.stringify(details))
     }
 
     /**
@@ -310,8 +316,8 @@ export class KissConnection extends EventEmitter {
      * @param ssid the callsign's SSID to check, an operator may have devices that do not support the custom compression of this class, so it's important to check the SSID as well.
      * @returns boolean value whether the callsign + SSID combo supports this class' custom Brotli compression algorithm.
      */
-    private static getCompressionCache(callsign: string, ssid: number): boolean {
-        return new LocalStorage('./compressionCache').getItem(callsign + '-' + ssid) === 'true'
+    private getCallsignCache(callsign: string, ssid: number): CacheItem {
+        return JSON.parse(this.callsignCache.getItem(callsign + '-' + ssid))
     }
 
     /**
@@ -404,7 +410,7 @@ export class KissConnection extends EventEmitter {
      * @param encodedKissFrame - The raw frame from your TNC or software modem, still encoded in KISS + AX.25 and not usable by the end user.
      * @returns A decoded frame in JSON format that you can read and write to.
      */
-    public static decode(encodedKissFrame: EncodedKissFrame): DecodedKissFrame {
+    public decode(encodedKissFrame: EncodedKissFrame): BaseKissFrame {
 
         let encoded = Array.from(new Uint8Array(encodedKissFrame))
 
@@ -413,7 +419,7 @@ export class KissConnection extends EventEmitter {
         }
         // do not remove ending 0xCO, because it is used as a marker that decoding is complete
 
-        const decoded: DecodedKissFrame = {
+        const decoded: BaseKissFrame = {
             destination: {
                 callsign: '',
                 ssid: 0,
@@ -457,8 +463,9 @@ export class KissConnection extends EventEmitter {
         }
 
         // if to reduce fs writes, store others who are compression compatible
+        // TODO: implement caching modulo 128
         if (acceptsCompression) {
-            KissConnection.setCompressionCache(decoded.source.callsign, decoded.source.ssid, true)
+            this.setCallsignCache(decoded.source.callsign, decoded.source.ssid, {supportsCompression: true})
         }
 
         // helps us keep track of which byte we're on after we decode potential repeaters that may or may not exist, makes more sense after the repeaters code section below
@@ -468,7 +475,7 @@ export class KissConnection extends EventEmitter {
         const repeaters: Repeater[] = KissConnection.decodeRepeaters(encoded)
         if (repeaters) {
             decoded.repeaters = repeaters
-            position += (7 * (repeaters.length)) // if no repeaters then position will now be 15, if 1 repeater then position will now be 22, if 2 repeaters, then position is now 29
+            position += (7 * repeaters.length) // if no repeaters then position will now be 15, if 1 repeater then position will now be 22, if 2 repeaters, then position is now 29
         }
 
         // Get control bit, which can be at index 15, 22, or 29. We're checking the first 2 bits of the next byte to determine frame type.
@@ -582,7 +589,7 @@ export class KissConnection extends EventEmitter {
      * @param decoded your JSON KissInput object.
      * @returns an EncodedKissFrame suitable for sending to your TNC.
      */
-    public static encode(decoded: DecodedKissFrame, useCompression: boolean = false): EncodedKissFrame {
+    public encode(decoded: BaseKissFrame): EncodedKissFrame {
 
         // check for user error before spending CPU cycles to encode
         if (decoded.destination.callsign.length > 6) {
@@ -597,12 +604,16 @@ export class KissConnection extends EventEmitter {
         if (decoded.source.ssid < 0 || decoded.source.ssid > 15) {
             throw new Error(`Source SSID ${decoded.source.ssid} is invalid, the value must be between 0 and 15 inclusive.`)
         }
+        if (decoded.frameType === 'unnumbered' && decoded.modulo === 128) {
+            throw new Error('Unnumbered frames cannot be used with modulo 128, only with modulo 8.')
+        }
 
         // set undefined properties to defaults
         decoded.commandResponse ??= 'command'
         decoded.repeaters ??= []
         decoded.frameType ??= 'unnumbered'
         decoded.pid ??= 0xF0
+        decoded.modulo ??= 8
 
         // stringify payload if it isn't a string already
         if (typeof decoded.payload !== 'string') {
@@ -611,7 +622,7 @@ export class KissConnection extends EventEmitter {
         
         // if compression is enabled, and the destination is in the cache as supporting compression, use compression if the compressed version is shorter
         let payloadIsCompressed = false
-        if (useCompression && KissConnection.getCompressionCache(decoded.destination.callsign, decoded.destination.ssid)) {
+        if (this.compression && this.getCallsignCache(decoded.destination.callsign, decoded.destination.ssid)) {
             const compressedPayload: string = JSONB.stringify(brotliCompressSync(decoded.payload as string))
             if (compressedPayload.length < (decoded.payload as string).length) {
                 decoded.payload = compressedPayload
@@ -636,7 +647,7 @@ export class KissConnection extends EventEmitter {
         encoded.push(...KissConnection.encodeAddress({
             callsign: decoded.source.callsign,
             commandOrHasBeenRepeated: false,
-            reservedBitOne: useCompression, // first reserved bit is used to indicate whether the sender can decode brotli compressed payloads
+            reservedBitOne: this.compression, // first reserved bit is used to indicate whether the sender can decode brotli compressed payloads
             reservedBitTwo: payloadIsCompressed, // second reserved bit is used to indicate whether the payload is compressed or not
             ssid: decoded.source.ssid,
             finalAddress: decoded.repeaters.length === 0 // true if it's the last address aka no repeaters
@@ -664,6 +675,22 @@ export class KissConnection extends EventEmitter {
             console.log(`Encoding of ${decoded.frameType} frames is not implemented yet, defaulting to unnumbered.`)
         }
         encoded.push(3) // just for the first two bits, leaving poll/final and unnumbered frame modifier bits alone for now
+
+        // if (decoded.modulo === 128) {
+        //     console.log('Modulo 128 is not supported yet, defaulting to modulo 8.')
+        // }
+
+        // if (decoded.frameType === 'unnumbered') {
+        //     switch (decoded.) {
+        //         case value:
+                    
+        //             break;
+            
+        //         default:
+        //             break;
+        //     }
+        // }
+
         encoded.push(decoded.pid); // default 240 aka 0xF0
 
         // encode payload

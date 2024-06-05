@@ -1,6 +1,6 @@
 // type prefix required to run on bun
 import { KissConnection, type KissConnectionConstructor } from './src'
-import { DecodedKissFrame } from './src/decodedkissframe'
+import { BaseKissFrame } from './src/decodedkissframe'
 import { Repeater } from './src/repeater'
 import { isEqual } from 'lodash'
 
@@ -60,7 +60,7 @@ const SERIALIZABLE_ARRAY: TestObject[] = [
 	}
 ]
 
-const testFrame: DecodedKissFrame = {
+const testFrame: BaseKissFrame = {
 	destination: {
 		callsign: THEIR_CALLSIGN,
 		ssid: THEIR_SSID,
@@ -105,8 +105,8 @@ function encodeDecodePacketTest() {
 	SERIALIZABLE_ARRAY.map((testable: TestObject) => {
 		try {
 			testFrame.payload = testable.value
-			const clone: DecodedKissFrame = structuredClone(testFrame) // MUST USE STRUCTUREDCLONE OTHERWISE THE ORIGINAL IS MUTATED AND THE TEST FAILS
-			const decoded: DecodedKissFrame = KissConnection.decode(KissConnection.encode(clone, CONSTRUCTOR.compression))
+			const clone: BaseKissFrame = structuredClone(testFrame) // MUST USE STRUCTUREDCLONE OTHERWISE THE ORIGINAL IS MUTATED AND THE TEST FAILS
+			const decoded: BaseKissFrame = new KissConnection({nullModem: true, compression: true}).decode(new KissConnection({nullModem: true, compression: true}).encode(clone))
 			console.log(`\nEncoding and decoding a ${testable.type}...`)
 
 			const recursiveCompareOverlapOnly = (original: any, decoded: any) => {
@@ -140,7 +140,7 @@ function decodeRepeatersTest() {
 	printDivider()
 	console.time('decodeRepeatersTest')
 	try {
-		const decodedRepeaters = KissConnection.decodeRepeaters(KissConnection.encode(testFrame, false))
+		const decodedRepeaters = KissConnection.decodeRepeaters(new KissConnection({nullModem: true, compression: false}).encode(testFrame))
 		console.log(decodedRepeaters)
 		if (isEqual(testFrame.repeaters, decodedRepeaters)) {
 			console.log(`Decoding repeaters from an encoded packet... \x1b[32mPASS\x1b[0m`)
@@ -192,7 +192,7 @@ function listenTest() {
 			console.log(`Listening on ${kissConnection.getTcpHost()}:${kissConnection.getTcpPort()}...`)
 		}
 		console.log('\x1b[33mWARNING:\x1b[0m not a passable test, manually verify received frames.')
-		kissConnection.listen((data: DecodedKissFrame) => {
+		kissConnection.listen((data: BaseKissFrame) => {
 			console.log(data)
 			// don't close so we can continue listening
 		})
@@ -209,7 +209,7 @@ function filterTest() {
 	try {
 		const kissConnection: KissConnection = new KissConnection(CONSTRUCTOR)
 		console.log('Listening only for packets addressed to your callsign and SSID...')
-		kissConnection.listen((frame: DecodedKissFrame) => {
+		kissConnection.listen((frame: BaseKissFrame) => {
 			if (frame.destination.callsign === MY_CALLSIGN && frame.destination.ssid === MY_SSID) {
 				console.log(`Filtering test... \x1b[32mPASS\x1b[0m`)
 			}
@@ -262,11 +262,11 @@ function listenAndRespondTest() {
 		else if (kissConnection.isTcp()) {
 			console.log(`Listening on ${kissConnection.getTcpHost()}:${kissConnection.getTcpPort()}...`)
 		}
-		kissConnection.listen((decodedFrame: DecodedKissFrame) => {
+		kissConnection.listen((decodedFrame: BaseKissFrame) => {
 			console.log('Received: ')
 			console.log(decodedFrame)
 			console.log('\x1b[33mWARNING:\x1b[0m You must manually verify that this frame meets what you expected.')
-			const response: DecodedKissFrame = {
+			const response: BaseKissFrame = {
 				source: {
 					callsign: MY_CALLSIGN,
 					ssid: MY_SSID,
@@ -304,7 +304,7 @@ function sendAndListenTest() {
 		}
 		kissConnection.send(testFrame)
 		console.log('Sent frame... awaiting response.')
-		kissConnection.listen((decodedFrame: DecodedKissFrame) => {
+		kissConnection.listen((decodedFrame: BaseKissFrame) => {
 			console.log('Received:')
 			console.log(decodedFrame)
 			console.log('Send and listen test... \x1b[32mPASS\x1b[0m')
