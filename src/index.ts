@@ -7,15 +7,20 @@ import { LocalStorage } from 'node-localstorage'
 import { isEqual } from 'lodash';
 
 // "type" must be included for Bun compatibility, using Bun version 1.1.10 as of writing
-import { type Repeater } from 'repeater';
-import { type EncodedKissFrame } from 'encodedkissframe';
-import { type DecodedKissFrame } from 'decodedkissframe';
-import { type ListenFilter } from 'listenfilter';
-import { type KissConnectionConstructor } from 'kissconnectionconstructor';
-import { type Address } from 'address';
+import { type Repeater } from './repeater';
+import { type EncodedKissFrame } from './encodedkissframe';
+import { type DecodedKissFrame } from './decodedkissframe';
+import { type ListenFilter } from './listenfilter';
+import { type KissConnectionConstructor } from './kissconnectionconstructor';
+import { type Address } from './address';
 
 // // re-export from index for better import organization by library users
-export { type Repeater, type EncodedKissFrame, type DecodedKissFrame, type ListenFilter, type KissConnectionConstructor, type Address }
+export { type Repeater } from './repeater'
+export { type EncodedKissFrame } from './encodedkissframe';
+export { type DecodedKissFrame } from './decodedkissframe';
+export { type ListenFilter } from './listenfilter';
+export { type KissConnectionConstructor } from './kissconnectionconstructor';
+export { type Address } from './address';
 
 /**
  * A SerialPort/Socket connection to a TNC or software modem that encodes, compresses (optional), sends, receives, decodes, decompresses (if necessary), and emits AX.25 packets for amateur radio use.

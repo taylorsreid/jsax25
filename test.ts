@@ -5,14 +5,14 @@ import { Repeater } from './src/repeater'
 import { isEqual } from 'lodash'
 
 // ******************** SET YOUR TEST VARIABLES BELOW ********************
-const MY_CALLSIGN: string = 'KO4LCM'
+const MY_CALLSIGN: string = 'N0CALL'
 const MY_SSID: number = 0
-const THEIR_CALLSIGN: string = 'KO4LCM'
+const THEIR_CALLSIGN: string = 'N0CALL'
 const THEIR_SSID: number = 0
 const REPEATERS: Repeater[] = [
 	{
-		callsign: 'WH6CMO',
-		ssid: 10,
+		callsign: 'RPTR1',
+		ssid: 1,
 		hasBeenRepeated: false
 	}
 ]
@@ -79,8 +79,8 @@ const testFrame: DecodedKissFrame = {
 // ******************** SET WHICH TESTS TO RUN BY COMMENTING OUT LINES ********************
 
 // these tests does not require a radio
-// encodeDecodePacketTest()
-// decodeRepeatersTest()
+encodeDecodePacketTest()
+decodeRepeatersTest()
 
 // all following tests require a radio
 
@@ -90,7 +90,7 @@ const testFrame: DecodedKissFrame = {
 // filterTest()
 // sendTest()
 // listenAndRespondTest()
-sendAndListenTest()
+// sendAndListenTest()
 
 // ******************** ACTUAL TEST FUNCTIONS ********************
 

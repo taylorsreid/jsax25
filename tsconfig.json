@@ -12,10 +12,8 @@
         "outDir": "dist",
         "baseUrl": "./src",
         "declaration": true,
-        "composite": true,
-        "declarationMap": false,
+        "declarationMap": true,
         "rootDir": "./src",
-        // "strictNullChecks": true
     },
     "include": ["src/**/*"]
 }
