@@ -14,6 +14,8 @@
         "declaration": true,
         "declarationMap": true,
         "rootDir": "./src",
+        "strictNullChecks": true,
+        "noUnusedLocals": true
     },
     "include": ["src/**/*"]
 }
