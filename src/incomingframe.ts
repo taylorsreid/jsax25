@@ -2,13 +2,12 @@ import JSONB from 'json-buffer';
 import { brotliDecompressSync } from "zlib";
 import { BaseFrame } from "./baseframe";
 import { controlFieldCombinations } from "./controlfieldcombinations";
-import { OutgoingFrame } from "./outgoingframe";
-import { type ControlFieldCombination, type InternalFrameType, type OutgoingFrameConstructor, type Repeater, type SFrameType, type UFrameType, type IFrameType, type TcpKissConstructor, type SerialKissConstructor, type MockModemKissConstructor } from "./types";
+import type { ControlFieldCombination, InternalFrameType, Repeater, SFrameType, UFrameType, IFrameType, TcpKissConstructor, SerialKissConstructor, MockModemKissConstructor } from "./types";
 import { KissConnection } from 'kissconnection';
 
 export class IncomingFrame extends BaseFrame {
 
-    private readonly encoded: number[]
+    protected readonly encoded: number[]
 
     constructor(encodedKissFrame: number[], kissConnection?: KissConnection | TcpKissConstructor | SerialKissConstructor | MockModemKissConstructor) {
         super()
@@ -32,7 +31,7 @@ export class IncomingFrame extends BaseFrame {
         }
     }
 
-    private static getBinaryString(byte: number): string {
+    protected static getBinaryString(byte: number): string {
         // get the ssid byte in binary form
         let binary: string = byte.toString(2)
         while (binary.length < 8) { // pad the SSID byte with zeros to a length of 8
@@ -41,7 +40,7 @@ export class IncomingFrame extends BaseFrame {
         return binary
     }
 
-    private static decodeCallsign(bytes: number[]): string {
+    protected static decodeCallsign(bytes: number[]): string {
         // counter and empty string for later
         let i = 0
         let callsign: string = ''
@@ -67,21 +66,23 @@ export class IncomingFrame extends BaseFrame {
         return this.destinationCallsign
     }
 
-    public getDestinationCommandBit(): boolean {
+    protected isDestinationCommandBit(): boolean {
         if (typeof this.destinationCommandBit === 'undefined') {
             this.destinationCommandBit = IncomingFrame.getBinaryString(this.encoded[7])[0] === '1'
         }
         return this.destinationCommandBit
     }
 
-    public getDestinationReservedBitOne(): boolean {
+    // reserved by this library for future use
+    protected isDestinationReservedBitOne(): boolean {
         if (typeof this.destinationReservedBitOne === 'undefined') {
             this.destinationReservedBitOne = IncomingFrame.getBinaryString(this.encoded[7])[1] === '0'
         }
         return this.destinationReservedBitOne
     }
 
-    public getDestinationReservedBitTwo(): boolean {
+    // reserved by this library for future use
+    protected isDestinationReservedBitTwo(): boolean {
         if (typeof this.destinationReservedBitTwo === 'undefined') {
             this.destinationReservedBitTwo = IncomingFrame.getBinaryString(this.encoded[7])[2] === '0'
         }
@@ -104,19 +105,19 @@ export class IncomingFrame extends BaseFrame {
         return this.sourceCallsign
     }
 
-    public getSourceCommandBit(): boolean {
+    protected isSourceCommandBit(): boolean {
         if (typeof this.sourceCommandBit === 'undefined') {
             this.sourceCommandBit = IncomingFrame.getBinaryString(this.encoded[14])[0] === '1'
         }
         return this.sourceCommandBit
     }
 
-    public isSourceAcceptingCompression(): boolean {
-        if (typeof this.sourceSupportsCompression === 'undefined') {
-            this.sourceSupportsCompression = IncomingFrame.getBinaryString(this.encoded[14])[1] === '0'
-            this.cacheManager.set(this.getSourceCallsign(), this.getSourceSsid(), { supportsCompression: this.sourceSupportsCompression })
+    public isCompressionEnabled(): boolean {
+        if (typeof this.compressionEnabled === 'undefined') {
+            this.compressionEnabled = IncomingFrame.getBinaryString(this.encoded[14])[1] === '0'
+            this.cacheManager.set(this.getSourceCallsign(), this.getSourceSsid(), { supportsCompression: this.compressionEnabled })
         }
-        return this.sourceSupportsCompression
+        return this.compressionEnabled
     }
 
     /**
@@ -124,10 +125,10 @@ export class IncomingFrame extends BaseFrame {
      * @returns A boolean representation of whether the bit is toggled on.
      */
     public isPayloadCompressed(): boolean {
-        if (typeof this.payloadIsCompressed === 'undefined') {
-            this.payloadIsCompressed = IncomingFrame.getBinaryString(this.encoded[14])[2] === '0' && this.isSourceAcceptingCompression() // double check both bits to prevent false positives
+        if (typeof this.payloadCompressed === 'undefined') {
+            this.payloadCompressed = IncomingFrame.getBinaryString(this.encoded[14])[2] === '0' && this.isCompressionEnabled() // double check both bits to prevent false positives
         }
-        return this.payloadIsCompressed
+        return this.payloadCompressed
     }
 
     /** Get the sender's SSID. */
@@ -136,10 +137,6 @@ export class IncomingFrame extends BaseFrame {
             this.sourceSsid = parseInt(IncomingFrame.getBinaryString(this.encoded[14]).slice(3, 7), 2)
         }
         return this.sourceSsid
-    }
-
-    public hasRepeaters(): boolean {
-        return this.encoded[14].toString(2).endsWith('0')
     }
 
     public getRepeaters(): Repeater[] {
@@ -160,11 +157,11 @@ export class IncomingFrame extends BaseFrame {
         return this.repeaters
     }
 
-    private getControlFieldBits(): string {
+    protected getControlFieldBits(): string {
         return IncomingFrame.getBinaryString(this.encoded[15 + (7 * this.getRepeaters().length)])
     }
 
-    private getInternalFrameType(): InternalFrameType {
+    protected getInternalFrameType(): InternalFrameType {
         if (typeof this.internalFrameType === 'undefined') {
             switch (this.getControlFieldBits().slice(6)) {
                 case '11':
@@ -187,14 +184,14 @@ export class IncomingFrame extends BaseFrame {
             if (this.getInternalFrameType() === 'unnumbered') {
                 const found: ControlFieldCombination | undefined = controlFieldCombinations.find((cc) => {
                     return cc.binaryOne === controlFieldBits.slice(0, 3) && cc.binaryTwo === controlFieldBits.slice(4)
-                })
-                this.frameType = found?.frameType
+                })! // all valid frame types are listed
+                this.frameType = found.frameType
             }
             else if (this.getInternalFrameType() === 'supervisory') {
                 const found: ControlFieldCombination | undefined = controlFieldCombinations.find((cc) => {
                     return cc.binaryTwo === controlFieldBits.slice(4)
-                })
-                this.frameType = found?.frameType
+                })! // all valid frame types are listed
+                this.frameType = found.frameType
                 this.receivedSequence = parseInt(controlFieldBits.slice(0, 3), 2)
             }
             else if (this.getInternalFrameType() === 'information') {
@@ -231,7 +228,7 @@ export class IncomingFrame extends BaseFrame {
      * @returns a number corresponding to the layer 3 protocol in use. See AX.25 documentation for a key: value table.
      */
     public getPid(): number | undefined {
-        if (typeof this.pid === 'undefined' && this.hasPid()) {
+        if (typeof this.pid === 'undefined' && (this.getFrameType() === 'information' || this.getFrameType() === 'UI')) {
             this.pid = this.encoded[16 + (7 * this.getRepeaters().length)]
         }
         return this.pid
@@ -243,7 +240,7 @@ export class IncomingFrame extends BaseFrame {
             this.payload = ''
 
             // 
-            let position: number = (this.hasPid() ? 17 : 16) + (7 * this.getRepeaters().length) // if no repeaters then position is 16, if 1 repeater then position is 23, if 2 repeaters then position is 30
+            let position: number = ((this.getFrameType() === 'information' || this.getFrameType() === 'UI') ? 17 : 16) + (7 * this.getRepeaters().length) // if no repeaters then position is 16, if 1 repeater then position is 23, if 2 repeaters then position is 30
 
             // 
             this.payload = String.fromCharCode(...this.encoded.slice(position, this.encoded.lastIndexOf(0xC0)))
@@ -258,9 +255,6 @@ export class IncomingFrame extends BaseFrame {
                     this.cacheManager.set(this.getDestinationCallsign(), this.getDestinationSsid(), { supportsCompression: false })
                 }
             }
-
-            // strip whitespace that some sources occasionally send
-            // this.payload = (this.payload as string).trim()
 
             // if the decoded payload starts with JSONish characters, try parsing it. Do not parse information frames because multiple frame payloads need to be concatenated first
             if (((this.payload as string).startsWith('{') || (this.payload as string).startsWith('[')) && this.getFrameType() !== 'information') {
@@ -283,32 +277,32 @@ export class IncomingFrame extends BaseFrame {
         return this.payload
     }
 
-    public createResponse(args?: OutgoingFrameConstructor): OutgoingFrame {
+    // public createResponse(args?: OutgoingParams): OutgoingFrame {
 
-        if (typeof this.kissConnection === 'undefined') {
-            throw new Error(`You must have a valid KissConnection set to call IncomingFrame.createResponse()`)
-        }
+    //     if (typeof this.kissConnection === 'undefined') {
+    //         throw new Error(`You must have a valid KissConnection set to call IncomingFrame.createResponse()`)
+    //     }
 
-        // switch (this.getFrameType()) {
-        //     case 'UI': // let's be real, most people just want APRS
+    //     switch (this.getFrameType()) {
+    //         case 'UI': // let's be real, most people just want APRS
                 
-        //         break;
-        //     case 'SABM'
+    //             break;
+    //         case 'SABM'
 
-        //     // default RNR because it's probably modulo 128 which isn't supported yet
-        // }
+    //         // default RNR because it's probably modulo 128 which isn't supported yet
+    //     }
 
-        args ??= {}
-        args.destinationCallsign ??= this.getSourceCallsign(),
-        args.destinationSsid ??= this.getSourceSsid(),
-        args.sourceCallsign ??= this.getKissConnection().getMyCallsign(),
-        args.sourceSsid ??= this.getKissConnection().getMySsid(),
-        args.repeaters ??= structuredClone(this.getRepeaters()).map((r) => { // if you don't use structured clone, it'll mutate the original and cause the tests to fail
-            r.hasBeenRepeated = false
-            return r
-        })
-        args.kissConnection ??= this.getKissConnection()
-        return this.getKissConnection().createOutgoing(args)
-    }
+    //     args ??= {}
+    //     args.destinationCallsign ??= this.getSourceCallsign(),
+    //     args.destinationSsid ??= this.getSourceSsid(),
+    //     args.sourceCallsign ??= this.getKissConnection().getMyCallsign(),
+    //     args.sourceSsid ??= this.getKissConnection().getMySsid(),
+    //     args.repeaters ??= structuredClone(this.getRepeaters()).map((r) => { // if you don't use structured clone, it'll mutate the original and cause the tests to fail
+    //         r.hasBeenRepeated = false
+    //         return r
+    //     })
+    //     args.kissConnection ??= this.getKissConnection()
+    //     return this.getKissConnection().createOutgoing(args)
+    // }
 
 }

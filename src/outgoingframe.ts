@@ -3,82 +3,69 @@ import { brotliCompressSync } from "zlib";
 import { BaseFrame } from "./baseframe";
 import { controlFieldCombinations } from "./controlfieldcombinations";
 import { KissConnection } from "./kissconnection";
-import { type OutgoingFrameConstructor, type CommandResponse, type ControlFieldCombination, type MockModemKissConstructor, type Repeater, type SFrameType, type SerialKissConstructor, type TcpKissConstructor, type UFrameType, type IFrameType } from "./types";
+import type { ControlFieldCombination, MockModemKissConstructor, Repeater, SFrameType, SerialKissConstructor, TcpKissConstructor, UFrameType, IFrameType, OutgoingConstructor, InternalFrameType } from "./types";
 
 export class OutgoingFrame extends BaseFrame {
 
-    constructor(args: OutgoingFrameConstructor) {
+    constructor(frameParams: OutgoingConstructor) {
         super()
 
+        // responsible for the send() method and isCompressionEnabled()
+        this.setKissConnection(frameParams.kissConnection)
+
         // destination subfield
-        if (args?.destinationCallsign) {
-            this.setDestinationCallsign(args.destinationCallsign) // NO DEFAULT
-        }
-        this.setDestinationSsid(args.destinationSsid ?? 0)
-            .setDestinationReservedBitOne(args.destinationReservedBitOne ?? false) // currently unused
-            .setDestinationReservedBitTwo(args.destinationReservedBitTwo ?? false) // currently unused
+        .setDestinationCallsign(frameParams.destinationCallsign) // required
+        .setDestinationSsid(frameParams.destinationSsid) // required
+        .setDestinationReservedBitOne(false) // reserved by this library for future use
+        .setDestinationReservedBitTwo(false) // reserved by this library for future use
 
-        // source subfield
-        if (args.sourceCallsign) {
-            this.setSourceCallsign(args.sourceCallsign) // NO DEFAULT
-        }
-        this.setSourceSsid(args.sourceSsid ?? 0)
+        // source subfield is base on KissConnection
         // source reserved bits are computed and not settable
+        // command or response value is computed by setFrameType() and is not settable
 
-        // computed from each address subfield's control bits
-        .setCommandResponse(args.commandResponse ?? 'command')
+        .setRepeaters(frameParams.repeaters ?? [])
 
-        // default to empty array to avoid undefined errors
-        .setRepeaters(args.repeaters ?? [])
+        // sets frame type from control subfield and also sets internalFrameType, which is hidden from dev api for simplicity, also sets commandResponse appropriately
+        .setFrameType(frameParams.frameType ?? 'UI')
+        .setReceivedSequence(frameParams.receivedSequence ?? 0)
+        .setSendSequence(frameParams.sendSequence ?? 0)
 
-        // control subfield, actual U, I, or S frame is hidden from user
-        .setFrameType(args.frameType ?? 'UI')
-        if (typeof args.receivedSequence === 'number') { // must check type, not truthiness because 0 evaluates to false
-            this.setReceivedSequence(args.receivedSequence)
-        }
-        this.setPollOrFinal(args.pollFinal ?? true) // should always be true for a UI
-        if (typeof args.sendSequence === 'number') { // must check type, not truthiness because 0 evaluates to false
-            this.setSendSequence(args.sendSequence)
-        }
-
-        // set but will be ignored if not the right frame type
-        this.setPid(args.pid ?? 240)
-
-        this.setPayload(args.payload)
-
-        // for calling the send method
-        if (args.kissConnection) {
-            this.setKissConnection(args.kissConnection)
-        }
+        .setPollOrFinal(frameParams.pollFinal ?? false)
+        .setPayload(frameParams.payload)
+        .setPid(frameParams.pid ?? 240)
 
     }
 
-    public getDestinationCallsign(): string | undefined {
+    public getDestinationCallsign(): string {
         return this.destinationCallsign
     }
     public getDestinationSsid(): number {
         return this.destinationSsid
     }
-    public getDestinationCommandBit(): boolean {
+    protected isDestinationCommandBit(): boolean {
         return this.destinationCommandBit
     }
-    public getDestinationReservedBitOne(): boolean {
+
+    // reserved by this library for future use
+    protected isDestinationReservedBitOne(): boolean {
         return this.destinationReservedBitOne
     }
-    public getDestinationReservedBitTwo(): boolean {
+
+    // reserved by this library for future use
+    protected isDestinationReservedBitTwo(): boolean {
         return this.destinationReservedBitTwo
     }
-    public getSourceCallsign(): string | undefined {
-        return this.sourceCallsign
+    public getSourceCallsign(): string {
+        return this.getKissConnection().getMyCallsign()
     }
     public getSourceSsid(): number {
-        return this.sourceSsid
+        return this.getKissConnection().getMySsid()
     }
-    public getSourceCommandBit(): boolean {
+    protected isSourceCommandBit(): boolean {
         return this.sourceCommandBit
     }
-    public isSourceAcceptingCompression(): boolean {
-        return this.getKissConnection().getUseCompression() ?? false
+    public isCompressionEnabled(): boolean {
+        return this.getKissConnection().isCompressionEnabled()
     }
 
     /**
@@ -87,25 +74,28 @@ export class OutgoingFrame extends BaseFrame {
      * @returns 
      */
     public isPayloadCompressed(): boolean {
-        return this.payloadIsCompressed ?? false
+        if (typeof this.getPayload !== 'undefined') {
+            this.payloadCompressed = (JSONB.stringify(brotliCompressSync(this.getPayload())).length < JSONB.stringify(this.getPayload()).length) && this.isCompressionEnabled()
+        }
+        return this.payloadCompressed ??= false
     }
 
     //getCommandResponse is in base class because it's a computed value
-
-    public hasRepeaters(): boolean {
-        return this.getRepeaters().length > 1
-    }
 
     public getRepeaters(): Repeater[] {
         return this.repeaters
     }
 
-    public getFrameType(): UFrameType | SFrameType | IFrameType | undefined {
+    public getFrameType(): UFrameType | SFrameType | IFrameType {
         return this.frameType
     }
 
     public getReceivedSequence(): number | undefined {
-        return this.receivedSequence
+        // hide set received sequence if frame type doesn't require it
+        if (this.requiresReceivedSequence()) {
+            return this.receivedSequence
+        }
+        return undefined
     }
 
     public isPollOrFinal(): boolean {
@@ -113,11 +103,19 @@ export class OutgoingFrame extends BaseFrame {
     }
 
     public getSendSequence(): number | undefined {
-        return this.sendSequence
+        // hide set send sequence if frame type doesn't require it
+        if (this.requiresSendSequence()) {
+            return this.sendSequence
+        }
+        return undefined
     }
 
     public getPid(): number | undefined {
-        return this.pid
+        // hide set pid if frame type doesn't require it
+        if (this.getFrameType() === 'UI' || this.getFrameType() === 'information') {
+            return this.pid ??= 240
+        }
+        return undefined
     }
 
     /**
@@ -128,9 +126,15 @@ export class OutgoingFrame extends BaseFrame {
         return this.payload
     }
 
-    private static encodeAddressField(callsign: string, commandOrHasBeenRepeated: boolean, reservedBitOne: boolean, reservedBitTwo: boolean, ssid: number, finalAddress: boolean): number[] {
+    protected getInternalFrameType(): InternalFrameType {
+        return this.internalFrameType
+    }
 
-        // no need to do preflight checks in this private method, already done via the setters
+    protected static encodeAddressField(callsign: string, commandOrHasBeenRepeated: boolean, reservedBitOne: boolean, reservedBitTwo: boolean, ssid: number, finalAddress: boolean): number[] {
+
+        // no need to do preflight checks in this protected method, already done via the setters
+
+        callsign = callsign.padEnd(6, ' ')
 
         // empty array to hold our encoded results
         let bytes: number[] = []
@@ -159,9 +163,9 @@ export class OutgoingFrame extends BaseFrame {
         return bytes
     }
 
-    private static encodeControlField(bitsOne: string | number, pollFinal: boolean, bitsTwo: string | number): number {
+    protected static encodeControlField(bitsOne: string | number, pollFinal: boolean, bitsTwo: string | number): number {
 
-        // no need to do preflight checks in this private method, already done via the setters
+        // no need to do preflight checks in this protected method, these values are internally calculated
 
         // if a number is passed in, convert it to a binary string and pad it to a length of 3
         if (typeof bitsOne === 'number') {
@@ -183,14 +187,17 @@ export class OutgoingFrame extends BaseFrame {
     }
 
     public setDestinationCallsign(destinationCallsign: string): this {
-
         // pre flight check
         if (destinationCallsign.length < 1 || destinationCallsign.length > 6) {
             throw new Error(`'${destinationCallsign}' is not a valid destination callsign. Callsigns must have a length from 1 to 6 characters, inclusive.`)
         }
-
-        // uppercase per AX.25 spec, trim for prettiness for now even though we're going to pad it later
+        // uppercase per AX.25 spec, trim for prettiness, will repad at encode time
         this.destinationCallsign = destinationCallsign.toUpperCase().trim()
+        return this
+    }
+
+    protected setDestinationCommandBit(destinationCommandBit: boolean): this {
+        this.destinationCommandBit = destinationCommandBit
         return this
     }
 
@@ -205,69 +212,48 @@ export class OutgoingFrame extends BaseFrame {
         return this
     }
 
-    public setDestinationReservedBitOne(on: boolean): this {
+    // reserved by this library for future use
+    protected setDestinationReservedBitOne(on: boolean): this {
         this.destinationReservedBitOne = on
         return this
     }
 
-    public setDestinationReservedBitTwo(on: boolean): this {
+    // reserved by this library for future use
+    protected setDestinationReservedBitTwo(on: boolean): this {
         this.destinationReservedBitTwo = on
         return this
     }
 
-    public setSourceCallsign(sourceCallsign: string): this {
+    // no setSourceCallsign because it's set in KissConnection
 
-        // pre flight check
-        if (sourceCallsign.length < 1 || sourceCallsign.length > 6) {
-            throw new Error(`'${sourceCallsign}' is not a valid source callsign. Callsigns must have a length from 1 to 6 characters, inclusive.`) // TODO:
-        }
-
-        // uppercase per AX.25 spec, trim for prettiness for now even though we're going to pad it later
-        this.sourceCallsign = sourceCallsign.toUpperCase().trim()
+    protected setSourceCommandBit(sourceCommandBit: boolean): this {
+        this.sourceCommandBit = sourceCommandBit
         return this
     }
 
-    public setSourceSsid(sourceSsid: number): this {
-
-        // pre flight check
-        if (sourceSsid < 0 || sourceSsid > 15) {
-            throw new Error(`${sourceSsid} is not a valid source SSID. SSIDs must be between 0 and 15, inclusive.`)
-        }
-
-        this.sourceSsid = sourceSsid
-        return this
-    }
-
-    public setCommandResponse(commandResponse: CommandResponse): this {
-
-        switch (commandResponse) {
-            case 'command':
-                this.destinationCommandBit = true
-                this.sourceCommandBit = false
-                break;
-            case 'response':
-                this.destinationCommandBit = false
-                this.sourceCommandBit = true
-                break;
-            case 'legacy':
-                this.destinationCommandBit = false
-                this.sourceCommandBit = false
-                break;
-        }
-
-        return this
-    }
+    // no setSourceSsid because it's set in KissConnection
 
     /** The repeater path you wish to use in sending the packet, or the path that the packet was received on. Default none if not defined. */
     public setRepeaters(repeaters: Repeater[]): this {
         // decided not to truncate since some people are still doing more than 2 repeaters hops even though it's against AX.25 spec, plus it's a stupid rule
-        this.repeaters = repeaters
+
+        // uppercase everything
+        this.repeaters = repeaters.map((r) => {
+            r.callsign = r.callsign.toUpperCase() // only repair this, others can be defaulted at encode time because they're not critical
+            return r
+        })
         return this
     }
 
+    // convenience method to push a repeater
     public addRepeater(repeater: Repeater): this {
         // decided not to truncate since some people are still doing more than 2 repeaters hops even though it's against AX.25 spec, plus it's a stupid rule
         this.repeaters.push(repeater)
+        return this
+    }
+
+    protected setInternalFrameType(internalFrameType: InternalFrameType): this {
+        this.internalFrameType = internalFrameType
         return this
     }
 
@@ -276,16 +262,27 @@ export class OutgoingFrame extends BaseFrame {
         // find control field and corresponding frame type
         const found: ControlFieldCombination = controlFieldCombinations.find((cc) => {
             return cc.frameType === frameType
-        })! // guaranteed to be found, all valid control field types are listed in the db object
+        })! // guaranteed to be found, all valid frameTypes aka control field types are listed in the db object
 
-        this.frameType = found.frameType // bypass setter to avoid unnecessary additional call to the db object
-        this.internalFrameType = found.internalFrameType // set corresponding frame type
+        this.frameType = found.frameType
+        this.setInternalFrameType(found.internalFrameType)
 
         // set commandResponse toggle if it's included in the result
-        if (found.commandResponse) {
-            this.setCommandResponse(found.commandResponse) // make sure to call setter because it toggles the bits
+        switch (found.commandResponse) {
+            case 'command':
+                this.setDestinationCommandBit(true)
+                this.setSourceCommandBit(false)
+                break;
+            case 'response':
+                this.setDestinationCommandBit(false)
+                this.setSourceCommandBit(true)
+                break;
+            case 'legacy':
+                this.setDestinationCommandBit(false)
+                this.setSourceCommandBit(false)
+                break;
         }
-        if (found.pollFinal) {
+        if (typeof found.pollFinal === 'boolean') { // test for presence of a boolean, not truthiness
             this.setPollOrFinal(found.pollFinal)
         }
 
@@ -317,7 +314,6 @@ export class OutgoingFrame extends BaseFrame {
         if (pid < 0) {
             throw new Error(`PID ${pid} is invalid. PID must be a positive number.`)
         }
-        this.pid = pid
         return this
     }
 
@@ -325,6 +321,18 @@ export class OutgoingFrame extends BaseFrame {
     public setPayload(payload: any): this {
         this.payload = payload
         return this
+    }
+
+    protected isPayloadAllowed(): boolean {
+        switch (this.getFrameType()) {
+            case 'SABM':
+            case 'DISC':
+            case 'UA':
+            case 'DM':
+                return false
+            default:
+                return true
+        }
     }
 
     public setKissConnection(kissConnection: KissConnection | TcpKissConstructor | SerialKissConstructor | MockModemKissConstructor): this {
@@ -339,70 +347,35 @@ export class OutgoingFrame extends BaseFrame {
 
     public getEncoded(): number[] {
 
-        // check for undefined properties, all other properties should have been set in the constructor or by setter methods, setter methods validate input
-        if (typeof this.destinationCallsign === 'undefined' || this.destinationCallsign.length < 1) {
-            throw new Error('No destination callsign set. All frames must have a destination callsign.')
+        /**
+         * Check if the user changed the frame type using a setter but failed to set a received and/or send sequence and throw an error if so.
+         * All other properties should have been validated or set to a default through the setter methods.
+         */
+        if (this.requiresReceivedSequence() && typeof this.getReceivedSequence() === 'undefined') {
+            throw new Error(`No received sequence set. ${this.getFrameType()} frames must have a received sequence. Call OutgoingFrame.setReceivedSequence(number) or set one in the constructor.`)
         }
-        if (typeof this.sourceCallsign === 'undefined' || this.sourceCallsign.length < 1) {
-            throw new Error('No source callsign set. All frames must have a source callsign.')
-        }
-        if (this.hasReceivedSequence() && typeof this.receivedSequence === 'undefined') {
-            throw new Error(`No received sequence set. ${this.getFrameType()} frames must have a received sequence.`)
-        }
-        if (this.hasSendSequence() && typeof this.sendSequence === 'undefined') {
-            throw new Error(`No send sequence set. ${this.getFrameType()} frames must have a send sequence.`)
-        }
-
-        // once again check that the user didn't set incompatible properties by calling the setter and using its side effects to make corrections
-        this.setFrameType(this.frameType!) // should never be undefined since the constructor gives it a default
-
-        // pad callsigns with spaces to a length of 6 per AX.25 spec, already uppercased via setters
-        while (this.destinationCallsign.length < 6) {
-            this.destinationCallsign += ' '
-        }
-        while (this.sourceCallsign.length < 6) {
-            this.sourceCallsign += ' '
-        }
-
-        // stringify payload if it isn't a string already, wait until encode time so that type is maintained until now
-        if (typeof this.getPayload() !== 'string') {
-            this.payload = JSONB.stringify(this.getPayload())
-        }
-
-        // if compression is enabled and the destination supports it, compress the payload if it's shorter than the original
-        if (
-            typeof this.getPayload() !== 'undefined' &&
-            this.isSourceAcceptingCompression() &&
-            this.cacheManager.get(this.destinationCallsign, this.destinationSsid)?.supportsCompression
-        ) {
-            const compressedPayload: string = JSONB.stringify(brotliCompressSync(this.payload as string))
-            if (compressedPayload.length < (this.payload as string).length) {
-                this.setPayload(compressedPayload)
-                this.payloadIsCompressed = true
-            }
-            else {
-                this.payloadIsCompressed = false
-            }
+        if (this.requiresSendSequence() && typeof this.getSendSequence() === 'undefined') {
+            throw new Error(`No send sequence set. ${this.getFrameType()} frames must have a send sequence.Call OutgoingFrame.setSendSequence(number) or set one in the constructor.`)
         }
 
         let encoded: number[] = []
 
         // encode and push destination address field
         encoded.push(...OutgoingFrame.encodeAddressField(
-            this.getDestinationCallsign()!, // already checked for undefined earlier
-            this.getDestinationCommandBit(),
-            this.getDestinationReservedBitOne(), // currently unused
-            this.getDestinationReservedBitTwo(), // currently unused
+            this.getDestinationCallsign(), // already uppercased via this.setDestinationCallsign() and gets padded in OutgoingFrame.encodeAddressField
+            this.isDestinationCommandBit(),
+            this.isDestinationReservedBitOne(), // currently unused
+            this.isDestinationReservedBitTwo(), // currently unused
             this.getDestinationSsid(),
             false // indicates that it's not the final address
         ))
 
         // encode and push source address field
         encoded.push(...OutgoingFrame.encodeAddressField(
-            this.getSourceCallsign()!, // already checked for undefined earlier
-            this.getSourceCommandBit(),
-            this.isSourceAcceptingCompression(), // 
-            this.isPayloadCompressed(), // 
+            this.getSourceCallsign(), // already uppercased via KissConnection.setMyCallsign() and gets padded in OutgoingFrame.encodeAddressField
+            this.isSourceCommandBit(),
+            this.isCompressionEnabled(),
+            this.isPayloadCompressed(), // if the payload is actually compressed or not
             this.getSourceSsid(),
             this.getRepeaters().length <= 0 // true if it's the last address aka no repeaters
         ))
@@ -428,29 +401,33 @@ export class OutgoingFrame extends BaseFrame {
         })! // should definitely exist in some form
 
         // encode control field
-        if (this.internalFrameType === 'information') {
-            encoded.push(OutgoingFrame.encodeControlField(this.getReceivedSequence()!, this.isPollOrFinal(), this.getSendSequence()!)) // ! ignore because already checked earlier
+        if (this.getInternalFrameType() === 'information') {
+            encoded.push(OutgoingFrame.encodeControlField(this.getReceivedSequence()!, this.isPollOrFinal(), this.getSendSequence()!)) // ! ignore because already checked earlier and threw an exception if undefined
         }
-        else if (this.internalFrameType === 'unnumbered') {
+        else if (this.getInternalFrameType() === 'unnumbered') {
                 encoded.push(OutgoingFrame.encodeControlField(foundCombination.binaryOne!, this.isPollOrFinal(), foundCombination.binaryTwo!)) // ! ignore because it definitely exists on all unnumbered entries
             }
-        else if (this.internalFrameType === 'supervisory') {
-            encoded.push(OutgoingFrame.encodeControlField(this.getReceivedSequence()!, this.isPollOrFinal(), foundCombination.binaryTwo!)) // ! ignore because it definitely exists on all supervisory entries
+        else if (this.getInternalFrameType() === 'supervisory') {
+            encoded.push(OutgoingFrame.encodeControlField(this.getReceivedSequence()!, this.isPollOrFinal(), foundCombination.binaryTwo!)) // ! ignore because already checked earlier and threw an exception if undefined
         }
 
-        if (this.frameType === 'information' || this.frameType === 'UI') {
-            encoded.push(this.getPid() ?? 240)
+        if (this.getFrameType() === 'information' || this.getFrameType() === 'UI') {
+            encoded.push(this.getPid() ?? 240) // should return 240 if the above is true, but just in case and to make TS happy
         }
+        
+        //
+        if (typeof this.getPayload() !== 'undefined' && this.isPayloadAllowed()) {
 
-        // encode payload
-        if (
-            typeof this.getPayload() !== 'undefined' &&
-            this.getFrameType() !== 'SABM'
-            //TODO: FIGURE OUT WHAT TYPES CAN'T HAVE PAYLOADS
-        ) {
-            (this.payload as string).split('').map((c) => {
+            let stringPayload: string = JSONB.stringify(this.getPayload())
+
+            if (this.isPayloadCompressed()) {
+                stringPayload = JSONB.stringify(brotliCompressSync(stringPayload))
+            }
+                
+            stringPayload.split('').map((c) => {
                 encoded.push(c.charCodeAt(0))
             })
+
         }
 
         // add header and footer to make AX.25 frame a KISS frame
@@ -464,19 +441,16 @@ export class OutgoingFrame extends BaseFrame {
     public send(): void {
 
         // 
-        if (typeof this.kissConnection === 'undefined') {
-            throw new Error('No valid KISS connection set to send frame with.')
-        }
+        const encoded: number[] = this.getEncoded()
 
         // 
-        const encoded: number[] = this.getEncoded()
         if (encoded.length < 17) {
             throw new Error(`Encoded packet is below the AX.25 minimum of 136 bits. The current length is ${encoded.length * 8} bits.`)
         }
 
         // 
-        this.kissConnection.getConnection().write(new Uint8Array(encoded))
-        // this.getKissConnection().getConnection().write(new Uint8Array(encoded))
+        // this.kissConnection.getConnection().write(new Uint8Array(encoded))
+        this.getKissConnection().getConnection().write(new Uint8Array(encoded))
     }
 
 }

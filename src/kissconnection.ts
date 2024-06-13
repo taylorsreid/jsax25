@@ -2,7 +2,7 @@ import { Socket, createConnection } from 'net';
 import { SerialPort } from 'serialport';
 import { EventEmitter } from 'stream';
 import { IncomingFrame } from './incomingframe';
-import { type TcpKissConstructor, type SerialKissConstructor, type MockModemKissConstructor, type OutgoingFrameConstructor } from './types';
+import type { TcpKissConstructor, SerialKissConstructor, MockModemKissConstructor, OutgoingConstructor } from './types';
 import { MockModem } from './mockmodem';
 import { OutgoingFrame } from './outgoingframe';
 
@@ -19,7 +19,7 @@ export class KissConnection extends EventEmitter {
     private myCallsign: string
     private mySsid: number
     private conn: SerialPort | Socket | MockModem
-    private useCompression: boolean
+    private compressionEnabled: boolean
     private tcpHost: string | undefined
     private tcpPort: number | undefined
     private serialPort: string | undefined
@@ -31,12 +31,12 @@ export class KissConnection extends EventEmitter {
 
         // use setters for validation
         this.setMyCallsign(args.myCallsign)
-        this.setMySsid(args.mySsid ?? 0)
-        this.setUseCompression(args.useCompression ?? false)
+        this.setMySsid(args.mySsid)
+        this.setCompressionEnabled(args.compressionEnabled ?? false)
 
         if ('tcpHost' in args && 'tcpPort' in args) {
             this.conn = createConnection({
-                host: this.tcpHost ??= args.tcpHost,
+                host: this.tcpHost ??= args.tcpHost, // assigning and passing as argument in one statement
                 port: this.tcpPort ??= args.tcpPort
             })
         }
@@ -66,6 +66,27 @@ export class KissConnection extends EventEmitter {
             this.emit('data', new IncomingFrame(data, this));
         });
 
+    }
+
+    /**
+     * Check if the current connection is a serial connection.
+     */
+    public isSerial(): boolean {
+        return this.conn instanceof SerialPort
+    }
+
+    /**
+     * Check if the current connection is a TCP socket connection.
+     */
+    public isTcp(): boolean {
+        return this.conn instanceof Socket
+    }
+
+    /**
+     * Check if the current connection is a MockModem.
+     */
+    public isMockModem(): boolean {
+        return this.conn instanceof MockModem
     }
 
     public getSerialPort(): string | undefined {
@@ -106,7 +127,7 @@ export class KissConnection extends EventEmitter {
             throw new Error(`'${myCallsign}' is not a valid callsign. Callsigns must have a length from 1 to 6 characters, inclusive.`)
         }
 
-        // uppercase per AX.25 spec, trim for prettiness
+        // uppercase per AX.25 spec, trim for prettiness, will repad at encode time
         this.myCallsign = myCallsign.toUpperCase().trim()
         return this
     }
@@ -126,34 +147,13 @@ export class KissConnection extends EventEmitter {
         return this
     }
 
-    public setUseCompression(useCompression: boolean): this {
-        this.useCompression = useCompression
+    public setCompressionEnabled(compressionEnabled: boolean): this {
+        this.compressionEnabled = compressionEnabled
         return this
     }
 
-    /**
-     * Check if the current connection is a serial connection.
-     */
-    public isSerial(): boolean {
-        return this.conn instanceof SerialPort
-    }
-
-    /**
-     * Check if the current connection is a TCP socket connection.
-     */
-    public isTcp(): boolean {
-        return this.conn instanceof Socket
-    }
-
-    /**
-     * Check if the current connection is a MockModem.
-     */
-    public isMockModem(): boolean {
-        return this.conn instanceof MockModem
-    }
-
-    public getUseCompression(): boolean {
-        return this.useCompression ?? false
+    public isCompressionEnabled(): boolean {
+        return this.compressionEnabled
     }
 
     /**
@@ -164,16 +164,9 @@ export class KissConnection extends EventEmitter {
         return this.conn
     }
 
-    public send(outgoingpacket: OutgoingFrame): void {
-        outgoingpacket.setKissConnection(this).send()
-    }
-
-    public createOutgoing(args?: OutgoingFrameConstructor): OutgoingFrame {
-        args ??= {}
-        args.sourceCallsign ??= this.getMyCallsign(),
-        args.sourceSsid ??= this.getMySsid(),
-        args.kissConnection ??= this
+    public createUI(args: OutgoingConstructor): OutgoingFrame {
         return new OutgoingFrame(args)
     }
+
 
 }

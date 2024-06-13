@@ -16,8 +16,8 @@ export interface ControlFieldCombination {
     frameType: SFrameType | UFrameType | IFrameType
     binaryOne?: string
     binaryTwo?: string
-    commandResponse?: CommandResponse,
-    pollFinal?: boolean
+    commandResponse: CommandResponse,
+    pollFinal?: boolean // see AX.25 docs section 6.2 for explanation
 }
 
 /**
@@ -31,9 +31,9 @@ export interface ControlFieldCombination {
  */
 interface BaseKissConstructor {
     myCallsign: string,
-    mySsid?: number,
+    mySsid: number,
     /** Enable optional compression of the payload/body portion of the packet using the brotli algorithm. Callsigns and SSIDs are not compressed in the spirit of amateur radio. Note that regardless of setting, if for some reason the compressed version is larger than the uncompressed version, the uncompressed version is sent. Default false if not defined. */
-    useCompression?: boolean;
+    compressionEnabled?: boolean;
 }
 
 export interface TcpKissConstructor extends BaseKissConstructor {
@@ -58,10 +58,10 @@ export interface MockModemKissConstructor extends BaseKissConstructor {
 /** A repeater used in a sent or received packet's repeater path. */
 export interface Repeater {
     callsign: string,
+    ssid: number
     hasBeenRepeated?: boolean
     reservedBitOne?: boolean,
     reservedBitTwo?: boolean,
-    ssid: number
 }
 
 export type CommandResponse = 'command' | 'response' | 'legacy'
@@ -70,21 +70,15 @@ export type SFrameType = 'RR' | 'RNR' | 'REJ' | 'SREJ'
 export type UFrameType = 'SABM' | 'DISC' | 'DM' | 'UA' | 'UI' | 'FRMR' | 'XID' | 'TEST'
 export type IFrameType = 'information'
 
-export interface OutgoingFrameConstructor {
-    destinationCallsign?: string
-    destinationSsid?: number
-    destinationReservedBitOne?: boolean
-    destinationReservedBitTwo?: boolean
-    sourceCallsign?: string
-    sourceSsid?: number
-    // source reserved bits are computed and not settable
-    commandResponse?: CommandResponse
-    repeaters?: Repeater[]
-    frameType?: UFrameType | SFrameType | IFrameType
-    receivedSequence?: number
-    pollFinal?: boolean
-    sendSequence?: number
-    pid?: number
-    payload?: any
-    kissConnection?: KissConnection | TcpKissConstructor | SerialKissConstructor | MockModemKissConstructor
+export interface OutgoingConstructor {
+    kissConnection: KissConnection | TcpKissConstructor | SerialKissConstructor | MockModemKissConstructor // NO DEFAULT, required
+    destinationCallsign: string // NO DEFAULT, required
+    destinationSsid: number // NO DEFAULT, required
+    repeaters?: Repeater[] // default []
+    frameType?: UFrameType | SFrameType | IFrameType // default UI
+    receivedSequence?: number // no default but only required on information and supervisory frames, will throw exception at encode if not set in constructor or setter
+    pollFinal?: boolean // default depends on context
+    sendSequence?: number // no default but only required on information frames, will throw exception at encode if not set in constructor or setter
+    pid?: number // default 240 if frameType === 'UI' || frameType === 'information', otherwise undefined
+    payload?: any // NO DEFAULT, but not required by any frame type
 }
