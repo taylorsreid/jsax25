@@ -1,16 +1,15 @@
 // import { test, describe, expect } from 'bun:test'
-// import { KissConnection } from '../src'
-// import { IncomingFrame } from '../src/incomingframe'
-// import { rmSync } from 'node:fs'
+// import { KissConnection } from '../src/kissconnection'
+// import { IncomingFrame } from '../src/frames/incoming'
+// import { UIFrame } from '../src/frames/outgoing/unnumbered/ui'
 
-// // empty callSignCache prior to running tests as it can change results
-// rmSync('tests/callsignCache', { recursive: true })
+// const kissConnection = new KissConnection({ mockModem: true })
 
-// const kissConnection = new KissConnection({ useMockModem: true, myCallsign: 'N0CALL', mySsid: 0, compressionEnabled: true })
-
-// const encodedOne: number[] = kissConnection.createUI({
+// const encodedOne: number[] = new UIFrame({
 //     destinationCallsign: 'KO4LCM',
 //     destinationSsid: 15,
+//     sourceCallsign: 'N0CALL',
+//     sourceSsid: 12,
 //     repeaters: [
 //         {
 //             callsign: 'WH6CMO',
@@ -26,9 +25,11 @@
 
 // }).getEncoded()
 
-// const encodedTwo: number[] = kissConnection.createUI({
+// const encodedTwo: number[] = new UIFrame({
 //     destinationCallsign: 'N0CALL',
 //     destinationSsid: 5,
+//     sourceCallsign: 'KO4LCM',
+//     sourceSsid: 7,
 //     pollFinal: true,
 //     pid: 240,
 //     payload: 'HELLO WORLD!',
@@ -36,8 +37,8 @@
 //     repeaters: []
 // }).getEncoded()
 
-// const decodedOne: IncomingFrame = new IncomingFrame(encodedOne, kissConnection)
-// const decodedTwo: IncomingFrame = new IncomingFrame(encodedTwo, kissConnection)
+// const decodedOne: IncomingFrame = new IncomingFrame(encodedOne)
+// const decodedTwo: IncomingFrame = new IncomingFrame(encodedTwo)
 
 // describe('Encode', () => {
 
@@ -120,11 +121,11 @@
 //     })
 
 //     describe('getCommandResponse()', () => {
-//         test('command', () => {
-//             expect(decodedOne.getCommandResponse()).toBe('command')
+//         test('response', () => {
+//             expect(decodedOne.getCommandOrResponse()).toBe('response')
 //         })
 //         test('response', () => {
-//             expect(decodedTwo.getCommandResponse()).toBe('response')
+//             expect(decodedTwo.getCommandOrResponse()).toBe('response')
 //         })
 //     })
 
@@ -154,7 +155,3 @@
     
     
 // })
-
-// // test('', () => {
-// //     expect().to
-// // })

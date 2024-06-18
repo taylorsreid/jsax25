@@ -1,98 +1,104 @@
-import { type ControlFieldCombination } from "./types";
-
+import { ControlFieldCombination } from "types";
 export const controlFieldCombinations: ControlFieldCombination[] = [
     {
-        internalFrameType: 'unnumbered',
-        frameType: 'SABM',
+        frameType: "unnumbered",
+        framesubType: "SABME",
+        binaryOne: '011',
+        binaryTwo: '1111',
+        commandResponse: "command",
+        pollOrFinal: true
+    },
+    {
+        frameType: 'unnumbered',
+        framesubType: 'SABM',
         binaryOne: '001',
         binaryTwo: '1111',
         commandResponse: 'command',
-        // pollFinal: true
+        pollOrFinal: true
     },
     {
-        internalFrameType: 'unnumbered',
-        frameType: 'DISC',
+        frameType: 'unnumbered',
+        framesubType: 'DISC',
         binaryOne: '010',
         binaryTwo: '0011',
         commandResponse: 'command',
-        // pollFinal: true,
+        pollOrFinal: true
     },
     {
-        internalFrameType: 'unnumbered',
-        frameType: 'DM',
+        frameType: 'unnumbered',
+        framesubType: 'DM',
         binaryOne: '000',
         binaryTwo: '1111',
         commandResponse: 'response',
-        // pollFinal: true
     },
     {
-        internalFrameType: 'unnumbered',
-        frameType: 'UA',
+        frameType: 'unnumbered',
+        framesubType: 'UA',
         binaryOne: '011',
         binaryTwo: '0011',
         commandResponse: 'response',
-        // pollFinal: true
+        pollOrFinal: true
     },
     {
-        internalFrameType: 'unnumbered',
-        frameType: 'FRMR',
+        frameType: 'unnumbered',
+        framesubType: 'FRMR',
         binaryOne: '100',
         binaryTwo: '0111',
         commandResponse: 'response'
     },
     {
-        internalFrameType: 'unnumbered',
-        frameType: 'UI',
+        frameType: 'unnumbered',
+        framesubType: 'UI',
         binaryOne: '000',
         binaryTwo: '0011',
-        commandResponse: 'response' // can technically be either but it's de facto response in APRS so we'll go with that to simplify the dev api
+        commandResponse: 'response', // can technically be either but it's de facto response in APRS so we'll go with that to simplify the dev api
+        // pollOrFinal: false // handled in the constructor
     },
     {
-        internalFrameType: 'unnumbered',
-        frameType: 'XID',
+        frameType: 'unnumbered',
+        framesubType: 'XID',
         binaryOne: '101',
         binaryTwo: '1111',
         commandResponse: 'command' // can be either but we'll just go with command to simplify the dev api
     },
     {
-        internalFrameType: 'unnumbered',
-        frameType: 'TEST',
+        frameType: 'unnumbered',
+        framesubType: 'TEST',
         binaryOne: '111',
         binaryTwo: '0011',
         commandResponse: 'command' // can be either but we'll just go with command to simplify the dev api
     },
     {
-        internalFrameType: 'supervisory',
-        frameType: 'RR',
+        frameType: 'supervisory',
+        framesubType: 'RR',
         binaryTwo: '0001',
         commandResponse: 'response' // not in spec but defacto
         // pollFinal depends on context
     },
     {
-        internalFrameType: 'supervisory',
-        frameType: 'RNR',
+        frameType: 'supervisory',
+        framesubType: 'RNR',
         binaryTwo: '0101',
         commandResponse: 'response' // not in spec but defacto
         // pollFinal depends on context
     },
     {
-        internalFrameType: 'supervisory',
-        frameType: 'REJ',
+        frameType: 'supervisory',
+        framesubType: 'REJ',
         binaryTwo: '1001',
         commandResponse: 'response' // guessing on this one because I've never seen it in the wild
         // pollFinal depends on context
     },
     {
-        internalFrameType: 'supervisory',
-        frameType: 'SREJ',
+        frameType: 'supervisory',
+        framesubType: 'SREJ',
         binaryTwo: '1101',
         commandResponse: 'response' // guessing on this one because I've never seen it in the wild
         // pollFinal no idea
     },
     {
-        internalFrameType: 'information',
-        frameType: 'information',
-        commandResponse: 'command' // not in spec but defacto
-        // pollFinal depends on context
+        frameType: "information",
+        framesubType: "information",
+        commandResponse: "command"
     }
 ];

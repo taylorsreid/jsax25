@@ -1,58 +1,25 @@
 import { KissConnection } from "kissconnection";
+import { NetConnectOpts } from "net";
 
-/**
- *
- */
-export interface CacheItem {
-    supportsCompression: boolean;
-    // modulo?: 8 | 128; TODO: implement in the future
-}
-
-/**
- *
- */
 export interface ControlFieldCombination {
-    internalFrameType: InternalFrameType
-    frameType: SFrameType | UFrameType | IFrameType
-    binaryOne?: string
-    binaryTwo?: string
-    commandResponse: CommandResponse,
-    pollFinal?: boolean // see AX.25 docs section 6.2 for explanation
+    frameType: FrameType ,
+    framesubType: UFrameType | SFrameType | IFrameType,
+    binaryOne?: string,
+    binaryTwo?: string,
+    commandResponse: 'command' | 'response',
+    pollOrFinal?: boolean
 }
 
-/**
- * @attribute serialPort?: string - The path to your TNC or software modem's serial port. If defined, it will override any TCP options that you include. Leave blank to use TCP. No default.
- * @attribute serialBaud?: number - A custom baud rate for your TNC or software modem's serial port. Default 1200 (most common) if not defined.
- * @attribute tcpHost?: string - The IP address or URL to your TNC or software mode. Default '127.0.0.1' (most common) if not defined.
- * @attribute tcpPort?: number - The TCP port to your TNC or software modem. Default 8100 (most common) if not defined.
- * @attribute compression?: boolean - Enable optional compression of the payload/body portion of the packet using the brotli algorithm. Callsigns and SSIDs are not compressed in the spirit of amateur radio. Note that regardless of setting, if for some reason the compressed version is larger than the uncompressed version, the uncompressed version is sent. Default false if not defined.
- * @attribute suppressConnectionErrors?: boolean - Mostly used for development and debugging. SerialPort and Socket will by default print errors to the console, set this to true to disable them. Default false if not defined.
- * @attribute nullModem?: boolean - A fake modem for running tests without a radio. Anything written to it will simply be printed to the console. Setting this to true overrides any and all serial and TCP options. Default to false if not defined.
- */
-interface BaseKissConstructor {
-    myCallsign: string,
-    mySsid: number,
-    /** Enable optional compression of the payload/body portion of the packet using the brotli algorithm. Callsigns and SSIDs are not compressed in the spirit of amateur radio. Note that regardless of setting, if for some reason the compressed version is larger than the uncompressed version, the uncompressed version is sent. Default false if not defined. */
-    compressionEnabled?: boolean;
-}
-
-export interface TcpKissConstructor extends BaseKissConstructor {
-    /** The IP address or URL to your TNC or software mode. No default. */
-    tcpHost: string,
-    /** The TCP port to your TNC or software modem. No default. */
-    tcpPort: number
-}
-
-export interface SerialKissConstructor extends BaseKissConstructor {
+export interface SerialConstructor {
     /** The path to your TNC or software modem's serial port. No default. */
-    serialPort: string,
+    path: string,
     /** A custom baud rate for your TNC or software modem's serial port. Default 1200 (most common) if not defined. */
-    serialBaud?: number
+    baudRate?: number
 }
 
-export interface MockModemKissConstructor extends BaseKissConstructor {
+export interface MockModemConstructor {
     /** Use a fake modem for running tests without a radio. Anything written to it will simply be printed to the console. */
-    useMockModem: boolean
+    mockModem: boolean
 }
 
 /** A repeater used in a sent or received packet's repeater path. */
@@ -64,21 +31,76 @@ export interface Repeater {
     reservedBitTwo?: boolean,
 }
 
-export type CommandResponse = 'command' | 'response' | 'legacy'
-export type InternalFrameType = 'information' | 'supervisory' | 'unnumbered'
+export type FrameType = 'information' | 'supervisory' | 'unnumbered'
 export type SFrameType = 'RR' | 'RNR' | 'REJ' | 'SREJ'
-export type UFrameType = 'SABM' | 'DISC' | 'DM' | 'UA' | 'UI' | 'FRMR' | 'XID' | 'TEST'
+export type UFrameType = 'SABME' | 'SABM' | 'DISC' | 'DM' | 'UA' | 'UI' | 'FRMR' | 'XID' | 'TEST'
 export type IFrameType = 'information'
 
 export interface OutgoingConstructor {
-    kissConnection: KissConnection | TcpKissConstructor | SerialKissConstructor | MockModemKissConstructor // NO DEFAULT, required
-    destinationCallsign: string // NO DEFAULT, required
-    destinationSsid: number // NO DEFAULT, required
+    kissConnection: KissConnection | NetConnectOpts | SerialConstructor | MockModemConstructor
+    destinationCallsign: string
+    destinationSsid?: number
+    destinationReservedBitOne?: boolean
+    destinationReservedBitTwo?: boolean
+    sourceCallsign: string
+    sourceSsid?: number
+    sourceReservedBitOne?: boolean
+    sourceReservedBitTwo?: boolean
     repeaters?: Repeater[] // default []
-    frameType?: UFrameType | SFrameType | IFrameType // default UI
-    receivedSequence?: number // no default but only required on information and supervisory frames, will throw exception at encode if not set in constructor or setter
-    pollFinal?: boolean // default depends on context
-    sendSequence?: number // no default but only required on information frames, will throw exception at encode if not set in constructor or setter
-    pid?: number // default 240 if frameType === 'UI' || frameType === 'information', otherwise undefined
-    payload?: any // NO DEFAULT, but not required by any frame type
+}
+
+export interface SFrameConstructor extends OutgoingConstructor {
+    modulo?: 8 | 128
+    receivedSequence: number
+}
+
+export interface TestFrameConstructor extends OutgoingConstructor {
+    payload?: any
+}
+
+export interface UIFrameConstructor extends OutgoingConstructor {
+    commandOrResponse?: 'command' | 'response'
+    pollOrFinal?: boolean
+    payload?: any
+    pid?: number, // will default to 240 in class if not set
+}
+
+export interface IFrameConstructor extends OutgoingConstructor {
+    modulo?: 8 | 128
+    receivedSequence: number
+    pollOrFinal: boolean
+    sendSequence: number
+    pid?: number // will default to 240 in class if not set
+    payload: any
+    
+}
+
+export interface hasPid {
+    getPid(): number,
+    setPid(pid: number): this
+}
+
+export interface hasPayload {
+    getPayload(): any,
+    setPayload(payload: any): this
+}
+
+export interface hasReceivedSequence {
+    getReceivedSequence(): number
+    setReceivedSequence(receivedSequence: number): this
+}
+
+export interface hasSendSequence {
+    getSendSequence(): number
+    setSendSequence(sendSequence: number): this
+}
+
+export interface mutableCommandOrResponse {
+    getCommandOrResponse(): 'command' | 'response'
+    setCommandOrResponse(commandOrResponse: "command" | "response"): this
+}
+
+export interface hasModulo {
+    getModulo(): 8 | 128
+    setModulo(modulo: 8 | 128): this
 }

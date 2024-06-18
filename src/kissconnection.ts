@@ -1,10 +1,9 @@
-import { Socket, createConnection } from 'net';
+import { NetConnectOpts, Socket, createConnection } from 'net';
 import { SerialPort } from 'serialport';
 import { EventEmitter } from 'stream';
-import { IncomingFrame } from './incomingframe';
-import type { TcpKissConstructor, SerialKissConstructor, MockModemKissConstructor, OutgoingConstructor } from './types';
+import { IncomingFrame } from './frames/incoming';
+import type { MockModemConstructor, SerialConstructor} from './types';
 import { MockModem } from './mockmodem';
-import { OutgoingFrame } from './outgoingframe';
 
 /**
  * A SerialPort/Socket connection to a TNC or software modem that encodes, compresses (optional), sends, receives, decodes, decompresses (if necessary), and emits AX.25 packets for amateur radio use.
@@ -16,54 +15,43 @@ import { OutgoingFrame } from './outgoingframe';
  * Call the listen(callback: (data: DecodedKissFrame) => { // do stuff }, filter?: ListenFilter) method to begin listening for packets. See method documentation for filtering specs.
  */
 export class KissConnection extends EventEmitter {
-    private myCallsign: string
-    private mySsid: number
     private conn: SerialPort | Socket | MockModem
-    private compressionEnabled: boolean
     private tcpHost: string | undefined
     private tcpPort: number | undefined
-    private serialPort: string | undefined
-    private serialBaud: number | undefined
+    private serialPath: string | undefined
+    private serialBaudRate: number | undefined
 
-    constructor(args: TcpKissConstructor | SerialKissConstructor | MockModemKissConstructor) {
+    constructor(args: NetConnectOpts | SerialConstructor | MockModemConstructor) {
 
         super()
 
-        // use setters for validation
-        this.setMyCallsign(args.myCallsign)
-        this.setMySsid(args.mySsid)
-        this.setCompressionEnabled(args.compressionEnabled ?? false)
-
-        if ('tcpHost' in args && 'tcpPort' in args) {
+        if ('host' in args && 'port' in args) {
             this.conn = createConnection({
-                host: this.tcpHost ??= args.tcpHost, // assigning and passing as argument in one statement
-                port: this.tcpPort ??= args.tcpPort
+                host: this.tcpHost ??= args.host, // assigning and passing as argument in one statement
+                port: this.tcpPort ??= args.port
             })
         }
 
-        if ('serialPort' in args) {
+        if ('path' in args) {
             // throw error if using SerialPort with Bun due to a bug in Bun
             if (process.versions.bun) {
                 throw new Error('Serial connections with Bun are not supported yet due to a bug in Bun.\nRun in Node or rerun with Bun using a TCP connection.\nSee https://github.com/oven-sh/bun/issues/10704 and https://github.com/oven-sh/bun/issues/4622 for details.')
             }
             this.conn = new SerialPort({
-                path: this.serialPort ??= args.serialPort,
-                baudRate: this.serialBaud ??= args.serialBaud ??= 1200,
+                path: this.serialPath ??= args.path,
+                baudRate: this.serialBaudRate ??= ('baudRate' in args) ? args.baudRate! : 1200,
                 lock: false
             })
         }
 
-        if ('useMockModem' in args) {
+        if ('mockModem' in args) {
             console.warn('You have instantiated a KISS connection with the useMockModem option enabled. This allows you to instantiate the class as if it were a KISS connection, but anything written to the connection will be simply output to the console.')
             this.conn = new MockModem()
         }
 
-        // TODO: FIGURE OUT WHETHER TO KEEP THIS
-        // this.conn.on('error', () => { }) // suppress built in SerialPort and Socket warning messages
-
         // attach event listener upon object instantiation
         this.conn.on('data', (data: number[]) => {
-            this.emit('data', new IncomingFrame(data, this));
+            this.emit('data', new IncomingFrame(data));
         });
 
     }
@@ -89,11 +77,11 @@ export class KissConnection extends EventEmitter {
         return this.conn instanceof MockModem
     }
 
-    public getSerialPort(): string | undefined {
-        return this.serialPort
+    public getSerialPath(): string | undefined {
+        return this.serialPath
     }
-    public getSerialBaud(): number | undefined {
-        return this.serialBaud
+    public getSerialBaudRate(): number | undefined {
+        return this.serialBaudRate
     }
     public getTcpHost(): string | undefined {
         return this.tcpHost
@@ -116,46 +104,6 @@ export class KissConnection extends EventEmitter {
         this.conn.end()
     }
 
-    public getMyCallsign(): string {
-        return this.myCallsign
-    }
-
-    public setMyCallsign(myCallsign: string): this {
-
-        // pre flight check
-        if (myCallsign.length < 1 || myCallsign.length > 6) {
-            throw new Error(`'${myCallsign}' is not a valid callsign. Callsigns must have a length from 1 to 6 characters, inclusive.`)
-        }
-
-        // uppercase per AX.25 spec, trim for prettiness, will repad at encode time
-        this.myCallsign = myCallsign.toUpperCase().trim()
-        return this
-    }
-
-    public getMySsid(): number {
-        return this.mySsid
-    }
-
-    public setMySsid(mySsid: number): this {
-
-        // pre flight check
-        if (mySsid < 0 || mySsid > 15) {
-            throw new Error(`${mySsid} is not a valid SSID. SSIDs must be between 0 and 15, inclusive.`)
-        }
-
-        this.mySsid = mySsid
-        return this
-    }
-
-    public setCompressionEnabled(compressionEnabled: boolean): this {
-        this.compressionEnabled = compressionEnabled
-        return this
-    }
-
-    public isCompressionEnabled(): boolean {
-        return this.compressionEnabled
-    }
-
     /**
      * Get the current connection in use to manage it manually.
      * @returns a configured SerialPort, (TCP) Socket, or MockModem instance.
@@ -163,10 +111,5 @@ export class KissConnection extends EventEmitter {
     public getConnection(): SerialPort | Socket | MockModem {
         return this.conn
     }
-
-    public createUI(args: OutgoingConstructor): OutgoingFrame {
-        return new OutgoingFrame(args)
-    }
-
 
 }
