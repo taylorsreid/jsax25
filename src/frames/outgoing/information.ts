@@ -1,4 +1,4 @@
-import type { IFrameConstructor, hasModulo, hasPayload, hasPid, hasReceivedSequence, hasSendSequence, } from "types";
+import type { IFrameConstructor,  hasModulo, hasPayload, hasPid, hasReceivedSequence, hasSendSequence, } from "types";
 import { OutgoingAbstract } from "./outgoingabstract"
 
 export class IFrame extends OutgoingAbstract implements hasPid, hasPayload, hasReceivedSequence, hasSendSequence, hasModulo {
@@ -6,13 +6,12 @@ export class IFrame extends OutgoingAbstract implements hasPid, hasPayload, hasR
     protected sendSequence: number;
 
     constructor(args: IFrameConstructor) {
-        super(args, 'information')
-        this.setModulo(args.modulo ?? 8)
-            .setSendSequence(args.sendSequence)
+        super(args, 'information', args.modulo)
+        this.setSendSequence(args.sendSequence)
             .setPollOrFinal(args.pollOrFinal)
             .setReceivedSequence(args.receivedSequence)
             .setPayload(args.payload)
-            .setPid(args.pid ?? 240)
+            .setPid(args.pid)
     }
 
     public getPid(): number {

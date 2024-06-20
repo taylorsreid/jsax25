@@ -1,25 +1,34 @@
 import { KissConnection } from "kissconnection";
-import { NetConnectOpts } from "net";
 
 export interface ControlFieldCombination {
     frameType: FrameType ,
-    framesubType: UFrameType | SFrameType | IFrameType,
+    frameSubtype: UFrameType | SFrameType | IFrameType,
     binaryOne?: string,
     binaryTwo?: string,
-    commandResponse: 'command' | 'response',
-    pollOrFinal?: boolean
+    commandOrResponse?: 'command' | 'response',
+    pollOrFinal?: boolean,
+    modulo: 8 | 128
 }
 
-export interface SerialConstructor {
+interface BaseKissConstructor {
+    txBaud: number
+}
+
+export interface TcpKissConstructor extends BaseKissConstructor {
+    tcpHost: string
+    tcpPort: number
+}
+
+export interface SerialKissConstructor extends BaseKissConstructor {
     /** The path to your TNC or software modem's serial port. No default. */
-    path: string,
-    /** A custom baud rate for your TNC or software modem's serial port. Default 1200 (most common) if not defined. */
-    baudRate?: number
+    serialPort: string,
+    /** A custom baud rate for your TNC or software modem's serial port. Default 19200 if not defined. */
+    serialBaud?: number
 }
 
-export interface MockModemConstructor {
+export interface MockKissConstructor extends BaseKissConstructor {
     /** Use a fake modem for running tests without a radio. Anything written to it will simply be printed to the console. */
-    mockModem: boolean
+    mock: boolean
 }
 
 /** A repeater used in a sent or received packet's repeater path. */
@@ -37,7 +46,7 @@ export type UFrameType = 'SABME' | 'SABM' | 'DISC' | 'DM' | 'UA' | 'UI' | 'FRMR'
 export type IFrameType = 'information'
 
 export interface OutgoingConstructor {
-    kissConnection: KissConnection | NetConnectOpts | SerialConstructor | MockModemConstructor
+    kissConnection: KissConnection
     destinationCallsign: string
     destinationSsid?: number
     destinationReservedBitOne?: boolean
@@ -50,29 +59,35 @@ export interface OutgoingConstructor {
 }
 
 export interface SFrameConstructor extends OutgoingConstructor {
-    modulo?: 8 | 128
+    pollOrFinal: boolean
+    modulo: 8 | 128
     receivedSequence: number
+    commandOrResponse: 'command' | 'response'
 }
 
 export interface TestFrameConstructor extends OutgoingConstructor {
+    commandOrResponse: 'command' | 'response'
     payload?: any
+}
+
+export interface XIDFrameConstructor extends OutgoingConstructor {
+    commandOrResponse: 'command' | 'response'
 }
 
 export interface UIFrameConstructor extends OutgoingConstructor {
-    commandOrResponse?: 'command' | 'response'
-    pollOrFinal?: boolean
-    payload?: any
-    pid?: number, // will default to 240 in class if not set
+    commandOrResponse: 'command' | 'response'
+    pollOrFinal: boolean
+    payload: any
+    pid: number
 }
 
 export interface IFrameConstructor extends OutgoingConstructor {
-    modulo?: 8 | 128
+    modulo: 8 | 128
     receivedSequence: number
     pollOrFinal: boolean
     sendSequence: number
-    pid?: number // will default to 240 in class if not set
+    pid: number
     payload: any
-    
 }
 
 export interface hasPid {

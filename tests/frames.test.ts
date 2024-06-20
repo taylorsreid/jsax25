@@ -1,62 +1,86 @@
 import { describe, expect, test } from 'bun:test'
-import { NetConnectOpts } from 'net'
-import { KissConnection, RRFrame, SerialConstructor, UIFrame, SFrameConstructor, XIDFrame } from '../src'
+import { KissConnection, RRFrame, XIDFrame, FrameFactory } from '../src'
+import { SupervisoryAbstract } from '../src/frames/outgoing/supervisory/supervisoryabstract'
+import { OutgoingAbstract } from '../src/frames/outgoing/outgoingabstract'
 
-const MY_CALLSIGN: string = 'N0CALL' // make sure that it's between 1 and 6 (inclusive) characters for the tests to run correctly
-const MY_SSID: number = 6 // make sure that it's between 0 and 15 (inclusive) for the tests to run correctly
-const THEIR_CALLSIGN: string = 'N1CALL'
-const THEIR_SSID: number = 12
+const kc: KissConnection = new KissConnection({
+    txBaud: 1200,
+	tcpHost: '127.0.0.1',
+    tcpPort: 8100
+})
 
-// TODO: YOU MUST USE ONE OF THE FOLLOWING CONSTRUCTORS AND COMMENT OUT THE OTHER
+const ff: FrameFactory = new FrameFactory({
+    kissConnection: kc,
+    destinationCallsign: 'N1CALL',
+    destinationSsid: 12,
+    sourceCallsign: 'N0CALL',
+    sourceSsid: 6
+})
 
-const CONSTRUCTOR: NetConnectOpts = {
-    host: '127.0.0.1',
-    port: 8100
-}
 
-// const CONSTRUCTOR: SerialConstructor = {
-//     path: 'COM5',
-//     baudRate: 19200
-// }
-
-if (typeof process.versions.bun !== 'undefined' && typeof CONSTRUCTOR['serialPort'] !== 'undefined') {
+if (typeof process.versions.bun !== 'undefined' && typeof kc.getSerialPort() !== 'undefined') {
     throw new Error(`Serial connections are not currently supported with Bun due to an upstream bug in Bun. Aborting tests. Please switch to a TCP KISS connection or install dev Jest and import it to this file to be compatible with Node.`)
-}
-
-if (MY_CALLSIGN.length < 1 || MY_CALLSIGN.length > 6) {
-    throw new Error(`${MY_CALLSIGN} is not a valid callsign. Please see the instructions. A valid callsign must be set to run the tests. Tests have been aborted.`)
-}
-
-if (MY_SSID < 0 || MY_SSID > 15) {
-    throw new Error(`${MY_SSID} is not a valid SSID. Please see the instructions. A valid SSID must be set to run the tests. Tests have been aborted.`)
 }
 
 describe('Frames', () => {
 
-    const kc: KissConnection = new KissConnection(CONSTRUCTOR)
-
-    describe('supervisory', () => {
-
-        const sfc: SFrameConstructor = {
-            receivedSequence: 0,
-            kissConnection: kc,
-            destinationCallsign: THEIR_CALLSIGN,
-            destinationSsid: THEIR_SSID,
-            sourceCallsign: MY_CALLSIGN,
-            sourceSsid: MY_SSID
-        }
-
-        // only testing one because they're all nearly identical and inherit the same methods
-        test(`new RRFrame() does not throw on valid constructor`, () => {
-            expect(() => new RRFrame(sfc)).not.toThrowError()
+    describe('outgoing abstract', () => {
+        const frame = ff.ui()
+        
+        test('frame.getKissConnection() instanceof KissConnection === true', () => {
+            expect(frame.getKissConnection()).toBeInstanceOf(KissConnection)
         })
 
-        test(`getters / setters`, () => {
-            const rr: RRFrame = new RRFrame(sfc)
-            expect(rr.getReceivedSequence()).toBe(sfc.receivedSequence)
+        describe('source fields', () => {
+            test(`ui.getSourceCallsign() === ff.getSourceCallsign()`, () => {
+                expect(frame.getSourceCallsign()).toBe(ff.getSourceCallsign())
+            })
+            test(`ui.getSourceSsid() === ff.getSourceSsid()`, () => {
+                expect(frame.getSourceSsid()).toBe(ff.getSourceSsid())
+            })
+        })
+
+        describe('destination fields', () => {
+            test(`ui.getDestinationCallsign() === ff.getDestinationCallsign()`, () => {
+                expect(frame.getDestinationCallsign()).toBe(ff.getDestinationCallsign())
+            })
+            test(`ui.getSourceSsid() === ff.getSourceSsid()`, () => {
+                expect(frame.getDestinationSsid()).toBe(ff.getDestinationSsid())
+            })
+        })
+    })
+
+    describe('supervisory', () => {
+        const rr = ff.rr(0, 'command', false, 8)
+
+        test('instanceof OutgoingAbstract', () => {
+            expect(rr).toBeInstanceOf(OutgoingAbstract)
+        })
+
+        test('instanceof SupervisoryAbstract', () => {
+            expect(rr).toBeInstanceOf(SupervisoryAbstract)
+        })
+
+        test('instanceof RRFrame', () => {
+            expect(rr).toBeInstanceOf(RRFrame)
+        })
+
+        test(`set/get received sequence`, () => {
             rr.setReceivedSequence(5)
             expect(rr.getReceivedSequence()).toBe(5)
-            rr.setReceivedSequence(sfc.receivedSequence)
+            rr.setReceivedSequence(0)
+        })
+
+        test('set/get modulo', () => {
+            rr.setModulo(128)
+            expect(rr.getModulo()).toBe(128)
+            rr.setModulo(8)
+        })
+
+        test('set/get command or response', () => {
+            rr.setCommandOrResponse('response')
+            expect(rr.getCommandOrResponse()).toBe('response')
+            rr.setCommandOrResponse('command')
         })
 
     })
@@ -64,69 +88,17 @@ describe('Frames', () => {
 
     describe('unnumbered', () => {
         describe('UIFrame', () => {
-            test(`new UIFrame() does not throw on a valid constructor`, () => {
-                expect(() => new UIFrame({
-                    destinationCallsign: THEIR_CALLSIGN,
-                    destinationSsid: THEIR_SSID,
-                    sourceCallsign: MY_CALLSIGN,
-                    sourceSsid: MY_SSID,
-                    kissConnection: kc
-                })).not.toThrowError()
-            })
         
             describe('getters', () => {
-                const ui = new UIFrame({
-                    destinationCallsign: THEIR_CALLSIGN,
-                    destinationSsid: THEIR_SSID,
-                    sourceCallsign: MY_CALLSIGN,
-                    sourceSsid: MY_SSID,
-                    kissConnection: kc
-                })
+                const ui = ff.ui('HELLO WORLD')
         
-                test('getKissConnection() instanceof KissConnection === true', () => {
-                    expect(ui.getKissConnection()).toBeInstanceOf(KissConnection)
-                })
-        
-                describe('source fields', () => {
-                    test(`manual.getSourceCallsign() === ${MY_CALLSIGN}`, () => {
-                        expect(ui.getSourceCallsign()).toBe(MY_CALLSIGN)
-                    })
-                    test(`manual.getSourceSsid() === ${MY_SSID}`, () => {
-                        expect(ui.getSourceSsid()).toBe(MY_SSID)
-                    })
-                })
-        
-                describe('destination fields', () => {
-                    test(`manual.getDestinationCallsign() === ${THEIR_CALLSIGN}`, () => {
-                        expect(ui.getDestinationCallsign()).toBe(THEIR_CALLSIGN)
-                    })
-                    test(`manual.getSourceSsid() === ${THEIR_SSID}`, () => {
-                        expect(ui.getDestinationSsid()).toBe(THEIR_SSID)
-                    })
-                })
+                
             })
             
         })
 
         describe(`XIDFrame`, () => {
-
-            test(`new XIDFrame() does not throw on a valid constructor`, () => {
-                expect(() => new XIDFrame({
-                    destinationCallsign: THEIR_CALLSIGN,
-                    destinationSsid: THEIR_SSID,
-                    sourceCallsign: MY_CALLSIGN,
-                    sourceSsid: MY_SSID,
-                    kissConnection: kc
-                })).not.toThrowError()
-            })
-
-            const xid = new XIDFrame({
-                destinationCallsign: THEIR_CALLSIGN,
-                destinationSsid: THEIR_SSID,
-                sourceCallsign: MY_CALLSIGN,
-                sourceSsid: MY_SSID,
-                kissConnection: kc
-            })
+            const xid = ff.xid()
 
             test('instanceof XIDFrame', () => {
                 expect(xid).toBeInstanceOf(XIDFrame)

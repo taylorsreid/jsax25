@@ -1,7 +1,7 @@
 import type { IFrameType, FrameType, Repeater, SFrameType, UFrameType } from "../types"
 
 export abstract class BaseAbstract {
-    protected abstract framesubType: UFrameType | SFrameType | IFrameType | undefined
+    protected abstract frameSubtype: UFrameType | SFrameType | IFrameType | undefined
     protected abstract frameType: FrameType | undefined
     protected abstract destinationCallsign: string | undefined
     protected abstract destinationSsid: number | undefined
@@ -15,9 +15,9 @@ export abstract class BaseAbstract {
     protected abstract sourceReservedBitTwo: boolean | undefined
     protected abstract repeaters: Repeater[] | undefined
     protected modulo: 8 | 128
-    protected abstract receivedSequence: number | undefined
-    protected abstract pollOrFinal: boolean | undefined
-    protected abstract sendSequence: number | undefined
+    // protected abstract receivedSequence: number | undefined
+    // protected abstract pollOrFinal: boolean | undefined
+    // protected abstract sendSequence: number | undefined
     protected abstract pid: number | undefined
     protected abstract payload: any | undefined
 
@@ -41,13 +41,6 @@ export abstract class BaseAbstract {
     protected abstract getPid(): number | undefined
     protected abstract getPayload(): any
     public abstract getEncoded(): number[]
-
-    protected setModulo(modulo: 8 | 128): this {
-
-        this.modulo = modulo
-        return this
-    }
-    
-    // remaining setters only in outgoing
+    protected abstract setModulo(modulo: 8 | 128): this
 
 }

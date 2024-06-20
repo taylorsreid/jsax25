@@ -3,6 +3,6 @@ import { OutgoingAbstract } from "../outgoingabstract"
 
 export class SABMEFrame extends OutgoingAbstract {
     constructor(args: OutgoingConstructor) {
-        super(args, 'SABME')
+        super(args, 'SABME', 8)
     }
 }

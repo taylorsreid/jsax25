@@ -16,11 +16,11 @@ export class IncomingFrame extends BaseAbstract {
     protected sourceReservedBitTwo: boolean | undefined;
     protected repeaters: Repeater[] | undefined;
     protected modulo: 8 | 128
-    protected receivedSequence: number | undefined
-    protected pollOrFinal: boolean | undefined;
-    protected sendSequence: number | undefined;
+    // protected receivedSequence: number | undefined // calculated based off of modulo
+    // protected pollOrFinal: boolean | undefined; // calculated based off of modulo
+    // protected sendSequence: number | undefined; // calculated based off of modulo
     protected frameType: MainFrameType | undefined;
-    protected framesubType: IFrameType | UFrameType | SFrameType | undefined;
+    protected frameSubtype: IFrameType | UFrameType | SFrameType | undefined;
     protected pid: number | undefined;
     protected payload: any | undefined;
     protected readonly encoded: number[]
@@ -31,8 +31,8 @@ export class IncomingFrame extends BaseAbstract {
         //
         this.encoded = Array.from(encodedKissFrame)
 
-        // 
-        this.setModulo(modulo)
+        //
+        this.modulo = modulo
 
         // 
         if (this.encoded[0] === 0xC0) {
@@ -41,7 +41,7 @@ export class IncomingFrame extends BaseAbstract {
     }
 
     protected static getBinaryString(byte: number): string {
-        // get the ssid byte in binary form
+        // get the byte in binary form
         let binary: string = byte.toString(2)
         while (binary.length < 8) { // pad the SSID byte with zeros to a length of 8
             binary = '0' + binary
@@ -203,7 +203,7 @@ export class IncomingFrame extends BaseAbstract {
     }
 
     private getControlFieldBits(): string {
-        return IncomingFrame.getBinaryString(this.encoded[15 + (7 * this.getRepeaters().length)])
+        return (this.getModulo() === 8) ? IncomingFrame.getBinaryString(this.encoded[15 + (7 * this.getRepeaters().length)]) : IncomingFrame.getBinaryString(this.encoded[15 + (7 * this.getRepeaters().length)]) + IncomingFrame.getBinaryString(this.encoded[16 + (7 * this.getRepeaters().length)])
     }
 
     private getFrameType(): MainFrameType {
@@ -222,59 +222,61 @@ export class IncomingFrame extends BaseAbstract {
         return this.frameType
     }
 
-    public getModulo(): 8 | 128 | undefined {
-        if (this.getFrameType() === 'unnumbered') {
-            return undefined
-        }
+    public getModulo(): 8 | 128 {
         return this.modulo
+    }
+    public setModulo(modulo: 8 | 128): this {
+        if (this.getFrameType() !== 'unnumbered') {
+            this.modulo = modulo
+        }
+        return this
     }
 
     public getFrameSubtype(): UFrameType | SFrameType | IFrameType {
-        if (typeof this.framesubType === 'undefined') {
+        if (typeof this.frameSubtype === 'undefined') {
+
             const cfb: string = this.getControlFieldBits()
-            this.pollOrFinal ??= cfb[3] === '1' // might as well while we're here
+            
             if (this.getFrameType() === 'unnumbered') {
                 const found: ControlFieldCombination = controlFieldCombinations.find((cc) => {
                     return cc.binaryOne === cfb.slice(0, 3) && cc.binaryTwo === cfb.slice(4)
                 })! // all valid frame types are listed
-                this.framesubType = found.framesubType
+                this.frameSubtype = found.frameSubtype
             }
             else if (this.getFrameType() === 'supervisory') {
                 const found: ControlFieldCombination = controlFieldCombinations.find((cc) => {
-                    return cc.binaryTwo === cfb.slice(4, 8)
+                    if (this.getModulo() === 8) {
+                        return cc.binaryTwo === cfb.slice(4, 8)
+                    }
+                    else {
+                        return cc.binaryTwo === cfb.slice(8, 16)
+                    }
                 })! // all valid frame types are listed
-                this.framesubType = found.framesubType
-                this.receivedSequence ??= parseInt(cfb.slice(0, 3), 2) // while we're here
-                // no send sequence on supervisory frames
+                this.frameSubtype = found.frameSubtype
             }
             else {
-                this.framesubType = 'information'
-                this.receivedSequence ??= parseInt(cfb.slice(0, 3), 2)  // while we're here
-                this.sendSequence ??= parseInt(cfb.slice(4, 7), 2)  // while we're here
+                this.frameSubtype = 'information'
             }
         }
-        return this.framesubType // it has to be one of the 3
+        return this.frameSubtype // it has to be one of the 3
     }
 
     public getReceivedSequence(): number | undefined {
-        if (typeof this.receivedSequence === 'undefined' && this.getFrameType() !== 'unnumbered') { // received sequences only exist on the other 2 internal frame types
-            this.receivedSequence = parseInt(this.getControlFieldBits().slice(0, 3), 2)
+        if (this.getFrameType() !== 'unnumbered') { // received sequences only exist on the other 2 internal frame types
+            return (this.getModulo() === 8) ? parseInt(this.getControlFieldBits().slice(0, 3), 2) : parseInt(this.getControlFieldBits().slice(0, 7), 2)
         }
-        return this.receivedSequence
+        return undefined
     }
 
     public isPollOrFinal(): boolean {
-        if (typeof this.pollOrFinal === 'undefined') {
-            this.pollOrFinal = this.getControlFieldBits()[3] === '1'
-        }
-        return this.pollOrFinal
+        return (this.getModulo() === 8) ? this.getControlFieldBits()[3] === '1' : this.getControlFieldBits()[7] === '1'
     }
 
     public getSendSequence(): number | undefined {
-        if (typeof this.sendSequence === 'undefined' && this.getFrameSubtype() === 'information') { // send sequences only exist on I frames
-            this.sendSequence = parseInt(this.getControlFieldBits().slice(4, 7), 2)
+        if (this.getFrameSubtype() === 'information') { // send sequences only exist on I frames
+            return (this.getModulo() === 8) ? parseInt(this.getControlFieldBits().slice(4, 7), 2) : parseInt(this.getControlFieldBits().slice(8, 16), 2)
         }
-        return this.sendSequence
+        return undefined
     }
 
     /**

@@ -1,12 +1,12 @@
 import { BaseAbstract } from "../baseabstract";
-import type { OutgoingConstructor, IFrameType, FrameType, MockModemConstructor, Repeater, SFrameType, SerialConstructor, UFrameType } from "../../types";
+import type { OutgoingConstructor, IFrameType, FrameType, Repeater, SFrameType, UFrameType } from "../../types";
 import JSONB from 'json-buffer'
 import { KissConnection } from "../../kissconnection";
 import { controlFieldCombinations } from "../../frames/controlFieldCombinations";
-import { NetConnectOpts } from "net";
+
 
 export abstract class OutgoingAbstract extends BaseAbstract {
-    protected readonly framesubType: IFrameType | UFrameType | SFrameType
+    protected readonly frameSubtype: IFrameType | UFrameType | SFrameType
     protected readonly frameType: FrameType
     protected kissConnection: KissConnection
     protected destinationCallsign: string
@@ -26,33 +26,26 @@ export abstract class OutgoingAbstract extends BaseAbstract {
     protected pollOrFinal: boolean;
     protected binaryTwo: string | undefined
     protected sendSequence: number | undefined
-    protected pid: number
+    protected pid: number | undefined;
     protected payload: any | undefined
 
-    constructor(args: OutgoingConstructor, frameType: IFrameType | UFrameType | SFrameType) {
+    constructor(args: OutgoingConstructor, frameSubtype: IFrameType | UFrameType | SFrameType, modulo: 8 | 128) {
         
         super()
 
         const found = controlFieldCombinations.find((cc) => {
-            return cc.framesubType === frameType
+            return cc.frameSubtype === frameSubtype && cc.modulo === modulo
         })
 
         if (found) {
-            this.framesubType = found.framesubType
+            this.frameSubtype = found.frameSubtype
             this.frameType = found.frameType
-            this.setCommandOrResponse(found.commandResponse)
-            if (found.binaryOne) {
-                this.binaryOne = found.binaryOne
-            }
-            if (found.binaryTwo) {
-                this.binaryTwo = found.binaryTwo
-            }
-            if (found.pollOrFinal) {
-                this.setPollOrFinal(found.pollOrFinal)
+            if (found.commandOrResponse) {
+                this.setCommandOrResponse(found.commandOrResponse)
             }
         }
         else {
-            throw new Error(`Invalid frame type of ${frameType} was passed to the super constructor.`)
+            throw new Error(`Invalid frame type of ${frameSubtype} was passed to the super constructor.`)
         }
 
         this.setKissConnection(args.kissConnection)
@@ -65,7 +58,8 @@ export abstract class OutgoingAbstract extends BaseAbstract {
             .setSourceReservedBitOne(args.sourceReservedBitOne ?? false)
             .setSourceReservedBitTwo(args.sourceReservedBitTwo ?? false)
             .setRepeaters(args?.repeaters ?? [])
-            // .pollOrFinal ??= false // default false to prevent undefined errors
+            .setModulo(modulo)
+            .pollOrFinal ??= false // prevent undefined errors
     }
 
     protected static encodeAddressField(callsign: string, commandOrHasBeenRepeated: boolean, reservedBitOne: boolean, reservedBitTwo: boolean, ssid: number, finalAddress: boolean): number[] {
@@ -101,39 +95,74 @@ export abstract class OutgoingAbstract extends BaseAbstract {
         return bytes
     }
 
-    protected static encodeControlField(bitsOne: string | number, pollFinal: boolean, bitsTwo: string | number): number {
+    protected static encodeControlField(modulo: 8 | 128, bitsOne: string | number, pollFinal: boolean, bitsTwo: string | number): number | number[] {
 
         // no need to do preflight checks in this protected method, these values are internally calculated
 
         // if a number is passed in, convert it to a binary string and pad it to a length of 3
         if (typeof bitsOne === 'number') {
             bitsOne = bitsOne.toString(2)
-            while (bitsOne.length < 3) {
-                bitsOne = '0' + bitsOne
+            if (modulo === 8) {
+                while (bitsOne.length < 3) {
+                    bitsOne = '0' + bitsOne
+                }
+            }
+            else {
+                while (bitsOne.length < 7) {
+                    bitsOne = '0' + bitsOne
+                }
             }
         }
 
+        bitsOne += pollFinal ? '1' : '0'
+
         if (typeof bitsTwo === 'number') {
             bitsTwo = bitsTwo.toString(2)
-            while (bitsTwo.length < 3) {
-                bitsTwo = '0' + bitsTwo
+            if (modulo === 8) {
+                while (bitsTwo.length < 3) {
+                    bitsTwo = '0' + bitsTwo
+                }
+            }
+            else {
+                while (bitsTwo.length < 7) {
+                    bitsTwo = '0' + bitsTwo
+                }
             }
             bitsTwo += '0' // if a number was passed in then it's an information frame, which gets an extra 0 at the end
         }
 
-        return parseInt(bitsOne + (pollFinal ? '1' : '0') + bitsTwo, 2)
+        // return parseInt(bitsOne + (pollFinal ? '1' : '0') + bitsTwo, 2)
+        return (modulo === 8) ? parseInt(bitsOne + bitsTwo, 2) : [parseInt(bitsOne, 2), parseInt(bitsTwo, 2)]
+    }
+
+    protected setModulo(modulo: 8 | 128): this {
+
+        const found = controlFieldCombinations.find((cc) => {
+            return cc.frameSubtype === this.frameSubtype && cc.modulo === modulo
+        })
+
+        if (found) {
+            this.modulo = modulo
+            if (found.binaryOne) {
+                this.binaryOne = found.binaryOne
+            }
+            if (found.binaryTwo) {
+                this.binaryTwo = found.binaryTwo
+            }
+            if (found.pollOrFinal) {
+                this.setPollOrFinal(found.pollOrFinal)
+            }
+        }
+
+        return this
+
     }
 
     public getKissConnection(): KissConnection {
         return this.kissConnection
     }
-    public setKissConnection(kissConnection: KissConnection | NetConnectOpts | SerialConstructor | MockModemConstructor): this {
-        if (kissConnection instanceof KissConnection) {
-            this.kissConnection = kissConnection
-        }
-        else {
-            this.kissConnection = new KissConnection(kissConnection)
-        }
+    public setKissConnection(kissConnection: KissConnection): this {
+        this.kissConnection = kissConnection
         return this
     }
 
@@ -143,7 +172,7 @@ export abstract class OutgoingAbstract extends BaseAbstract {
     public setDestinationCallsign(callsign: string): this {
         // pre flight check
         if (callsign.length < 1 || callsign.length > 6) {
-            throw new Error(`'${callsign}' is not a valid destination callsign. Callsigns must have a length from 1 to 6 characters, inclusive.`)
+            throw new Error(`'${callsign}' is not a valid destination callsign. Callsigns must have a length from 1 to 6 characters inclusive.`)
         }
         // uppercase per AX.25 spec, trim for prettiness, will repad at encode time
         this.destinationCallsign = callsign.toUpperCase().trim()
@@ -156,7 +185,7 @@ export abstract class OutgoingAbstract extends BaseAbstract {
     public setDestinationSsid(ssid: number): this {
         // pre flight check
         if (ssid < 0 || ssid > 15) {
-            throw new Error(`${ssid} is not a valid destination SSID. SSIDs must be between 0 and 15, inclusive.`)
+            throw new Error(`${ssid} is not a valid destination SSID. SSIDs must be between 0 and 15 inclusive.`)
         }
         this.destinationSsid = ssid
         return this
@@ -184,7 +213,7 @@ export abstract class OutgoingAbstract extends BaseAbstract {
     public setSourceCallsign(callsign: string): this {
         // pre flight check
         if (callsign.length < 1 || callsign.length > 6) {
-            throw new Error(`'${callsign}' is not a valid source callsign. Callsigns must have a length from 1 to 6 characters, inclusive.`)
+            throw new Error(`'${callsign}' is not a valid source callsign. Callsigns must have a length from 1 to 6 characters inclusive.`)
         }
         // uppercase per AX.25 spec, trim for prettiness, will repad at encode time
         this.sourceCallsign = callsign.toUpperCase().trim()
@@ -197,7 +226,7 @@ export abstract class OutgoingAbstract extends BaseAbstract {
     public setSourceSsid(ssid: number): this {
         // pre flight check
         if (ssid < 0 || ssid > 15) {
-            throw new Error(`${ssid} is not a valid destination SSID. SSIDs must be between 0 and 15, inclusive.`)
+            throw new Error(`${ssid} is not a valid source SSID. SSIDs must be between 0 and 15 inclusive.`)
         }
 
         this.sourceSsid = ssid
@@ -231,16 +260,15 @@ export abstract class OutgoingAbstract extends BaseAbstract {
         }
     }
     protected setCommandOrResponse(commandOrResponse: 'command' | 'response'): this {
-        switch (commandOrResponse) {
-            case 'command':
-                this.destinationCommandBit = true // command bits are on the main abstract
-                this.sourceCommandBit = false
-                return this
-            case 'response':
-                this.destinationCommandBit = false
-                this.sourceCommandBit = true
-                return this
+        if (commandOrResponse === 'command') {
+            this.destinationCommandBit = true
+            this.sourceCommandBit = false
         }
+        else {
+            this.destinationCommandBit = false
+            this.sourceCommandBit = true
+        }
+        return this
     }
     public isCommand(): boolean {
         return this.getCommandOrResponse() === 'command'
@@ -266,24 +294,28 @@ export abstract class OutgoingAbstract extends BaseAbstract {
     // convenience method to push a repeater
     public addRepeater(repeater: Repeater): this {
         // decided not to truncate since some people are still doing more than 2 repeaters hops even though it's against AX.25 spec, plus it's a stupid rule
+        repeater.callsign = repeater.callsign.toUpperCase()
         this.repeaters.push(repeater)
         return this
     }
 
     protected getModulo(): 8 | 128 {
-        // if (this.internalFrameType === 'unnumbered') {
-        //     return 8
-        // }
+        if (this.frameType === 'unnumbered') {
+            return 8
+        }
         return this.modulo
     }
 
-    protected getReceivedSequence(): number { // Doesn't exist on some frames. Only string to satisfy TS but in practice will only be exposed publicly returning number.
+    protected getReceivedSequence(): number { // Doesn't exist on some frames. ! because this method is only exposed in child classes where it is defined
         return this.receivedSequence!
     }
     // protected abstract getReceivedSequence(): number
     protected setReceivedSequence(receivedSequence: number): this {
-        if (receivedSequence < 0 || receivedSequence > 7) {
-            throw new Error(`Received sequence ${receivedSequence} must be between 0 and 7, inclusive.`)
+        if (this.getModulo() === 8 && (receivedSequence < 0 || receivedSequence > 7)) {
+            throw new Error(`Received sequence ${receivedSequence} must be between 0 and 7 inclusive when set to modulo 8.`)
+        }
+        else if (this.getModulo() === 128 && (receivedSequence < 0 || receivedSequence > 127)) {
+            throw new Error(`Received sequence ${receivedSequence} must be between 0 and 127 inclusive when set to modulo 128.`)
         }
         this.receivedSequence = receivedSequence
         return this
@@ -297,12 +329,15 @@ export abstract class OutgoingAbstract extends BaseAbstract {
         return this
     }
 
-    protected getSendSequence(): number { // Doesn't exist on some frames. Only string to satisfy TS but in practice will only be exposed publicly returning number.
+    protected getSendSequence(): number { // Doesn't exist on some frames. ! because this method is only exposed in child classes where it is defined
         return this.sendSequence!
     }
     protected setSendSequence(sendSequence: number): this {
-        if (sendSequence < 0 || sendSequence > 7) {
-            throw new Error(`Send sequence ${sendSequence} must be between 0 and 7, inclusive.`)
+        if (this.getModulo() === 8 && (sendSequence < 0 || sendSequence > 7)) {
+            throw new Error(`Send sequence ${sendSequence} must be between 0 and 7 inclusive when set to modulo 8.`)
+        }
+        else if (this.getModulo() === 128 && (sendSequence < 0 || sendSequence > 127)) {
+            throw new Error(`Send sequence ${sendSequence} must be between 0 and 127 inclusive when set to modulo 128.`)
         }
         this.sendSequence = sendSequence
         return this
@@ -329,17 +364,6 @@ export abstract class OutgoingAbstract extends BaseAbstract {
     }
 
     public getEncoded(): number[] {
-
-        /**
-         * Check if the user changed the frame type using a setter but failed to set a received and/or send sequence and throw an error if so.
-         * All other properties should have been validated or set to a default through the setter methods.
-         */
-        // if ((this.frameType === 'information' || this.mainFrameType === 'supervisory') && typeof this.receivedSequence === 'undefined') {
-        //     throw new Error(`No received sequence set. ${this.frameType} frames must have a received sequence. Call setReceivedSequence(number) or set one in the constructor.`)
-        // }
-        // if (this.frameType === 'information' && typeof this.sendSequence === 'undefined') {
-        //     throw new Error(`No send sequence set. ${this.frameType} frames must have a send sequence. Call setSendSequence(number) or set one in the constructor.`)
-        // }
 
         let encoded: number[] = []
 
@@ -380,22 +404,29 @@ export abstract class OutgoingAbstract extends BaseAbstract {
         }
 
         // encode control field
+        let ctl: number | number[]
         if (this.frameType === 'information') {
-            encoded.push(OutgoingAbstract.encodeControlField(this.getReceivedSequence(), this.isPollOrFinal(), this.getSendSequence()))
+            ctl = OutgoingAbstract.encodeControlField(this.getModulo(), this.getReceivedSequence(), this.isPollOrFinal(), this.getSendSequence())
         }
         else if (this.frameType === 'unnumbered') {
-            encoded.push(OutgoingAbstract.encodeControlField(this.binaryOne!, this.isPollOrFinal(), this.binaryTwo!))
+            ctl= OutgoingAbstract.encodeControlField(this.getModulo(), this.binaryOne!, this.isPollOrFinal(), this.binaryTwo!)
         }
-        else if (this.frameType === 'supervisory') {
-            encoded.push(OutgoingAbstract.encodeControlField(this.getReceivedSequence(), this.isPollOrFinal(), this.binaryTwo!))
+        else {
+            ctl = OutgoingAbstract.encodeControlField(this.getModulo(), this.getReceivedSequence(), this.isPollOrFinal(), this.binaryTwo!)
+        }
+        if (Array.isArray(ctl)) {
+            encoded.push(...ctl)
+        }
+        else {
+            encoded.push(ctl)
         }
 
-        if (typeof this.pid !== 'undefined' && (this.framesubType === 'information' || this.framesubType === 'UI')) {
+        if (typeof this.pid !== 'undefined' && (this.frameSubtype === 'information' || this.frameSubtype === 'UI')) {
             encoded.push(this.pid)
         }
 
         //
-        if (typeof this.payload !== 'undefined' && this.framesubType !== 'XID') {
+        if (typeof this.payload !== 'undefined' && this.frameSubtype !== 'XID') {
 
             let stringPayload: string
             if (typeof this.payload !== 'string') {
@@ -410,7 +441,7 @@ export abstract class OutgoingAbstract extends BaseAbstract {
             })
 
         }
-        else if (this.framesubType === 'XID') {
+        else if (this.frameSubtype === 'XID') { // the xid payload is just raw numbers
             encoded.push(...this.payload)
         }
 

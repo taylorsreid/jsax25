@@ -4,7 +4,7 @@ import { OutgoingAbstract } from "../outgoingabstract";
 export class TESTFrame extends OutgoingAbstract implements hasPayload, mutableCommandOrResponse {
 
     constructor(args: TestFrameConstructor) {
-        super(args, 'TEST')
+        super(args, 'TEST', 8)
         this.setPayload(args.payload)
     }
     

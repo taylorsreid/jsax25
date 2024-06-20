@@ -1,3 +1,5 @@
+export { FrameFactory } from './framefactory'
+
 // supervisory
 export { REJFrame } from './outgoing/supervisory/rej'
 export { RNRFrame } from './outgoing/supervisory/rnr'

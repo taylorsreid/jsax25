@@ -2,103 +2,135 @@ import { ControlFieldCombination } from "types";
 export const controlFieldCombinations: ControlFieldCombination[] = [
     {
         frameType: "unnumbered",
-        framesubType: "SABME",
+        frameSubtype: "SABME",
         binaryOne: '011',
         binaryTwo: '1111',
-        commandResponse: "command",
-        pollOrFinal: true
+        commandOrResponse: "command",
+        pollOrFinal: true,
+        modulo: 8
     },
     {
         frameType: 'unnumbered',
-        framesubType: 'SABM',
+        frameSubtype: 'SABM',
         binaryOne: '001',
         binaryTwo: '1111',
-        commandResponse: 'command',
-        pollOrFinal: true
+        commandOrResponse: 'command',
+        pollOrFinal: true,
+        modulo: 8
     },
     {
         frameType: 'unnumbered',
-        framesubType: 'DISC',
+        frameSubtype: 'DISC',
         binaryOne: '010',
         binaryTwo: '0011',
-        commandResponse: 'command',
-        pollOrFinal: true
+        commandOrResponse: 'command',
+        pollOrFinal: true,
+        modulo: 8
     },
     {
         frameType: 'unnumbered',
-        framesubType: 'DM',
+        frameSubtype: 'DM',
         binaryOne: '000',
         binaryTwo: '1111',
-        commandResponse: 'response',
+        commandOrResponse: 'response',
+        modulo: 8
     },
     {
         frameType: 'unnumbered',
-        framesubType: 'UA',
+        frameSubtype: 'UA',
         binaryOne: '011',
         binaryTwo: '0011',
-        commandResponse: 'response',
-        pollOrFinal: true
+        commandOrResponse: 'response',
+        pollOrFinal: true,
+        modulo: 8
     },
     {
         frameType: 'unnumbered',
-        framesubType: 'FRMR',
+        frameSubtype: 'FRMR',
         binaryOne: '100',
         binaryTwo: '0111',
-        commandResponse: 'response'
+        commandOrResponse: 'response',
+        modulo: 8
     },
     {
         frameType: 'unnumbered',
-        framesubType: 'UI',
+        frameSubtype: 'UI',
         binaryOne: '000',
         binaryTwo: '0011',
-        commandResponse: 'response', // can technically be either but it's de facto response in APRS so we'll go with that to simplify the dev api
-        // pollOrFinal: false // handled in the constructor
+        modulo: 8
     },
     {
         frameType: 'unnumbered',
-        framesubType: 'XID',
+        frameSubtype: 'XID',
         binaryOne: '101',
         binaryTwo: '1111',
-        commandResponse: 'command' // can be either but we'll just go with command to simplify the dev api
+        modulo: 8
     },
     {
         frameType: 'unnumbered',
-        framesubType: 'TEST',
+        frameSubtype: 'TEST',
         binaryOne: '111',
         binaryTwo: '0011',
-        commandResponse: 'command' // can be either but we'll just go with command to simplify the dev api
+        modulo: 8
     },
     {
         frameType: 'supervisory',
-        framesubType: 'RR',
+        frameSubtype: 'RR',
         binaryTwo: '0001',
-        commandResponse: 'response' // not in spec but defacto
-        // pollFinal depends on context
+        modulo: 8
     },
     {
         frameType: 'supervisory',
-        framesubType: 'RNR',
+        frameSubtype: 'RR',
+        binaryTwo: '00000001',
+        modulo: 128
+    },
+    {
+        frameType: 'supervisory',
+        frameSubtype: 'RNR',
         binaryTwo: '0101',
-        commandResponse: 'response' // not in spec but defacto
-        // pollFinal depends on context
+        modulo: 8
     },
     {
         frameType: 'supervisory',
-        framesubType: 'REJ',
+        frameSubtype: 'RNR',
+        binaryTwo: '00000101',
+        modulo: 128
+    },
+    {
+        frameType: 'supervisory',
+        frameSubtype: 'REJ',
         binaryTwo: '1001',
-        commandResponse: 'response' // guessing on this one because I've never seen it in the wild
-        // pollFinal depends on context
+        modulo: 8
     },
     {
         frameType: 'supervisory',
-        framesubType: 'SREJ',
+        frameSubtype: 'REJ',
+        binaryTwo: '00001001',
+        modulo: 128
+    },
+    {
+        frameType: 'supervisory',
+        frameSubtype: 'SREJ',
         binaryTwo: '1101',
-        commandResponse: 'response' // guessing on this one because I've never seen it in the wild
-        // pollFinal no idea
+        modulo: 8
+    },
+    {
+        frameType: 'supervisory',
+        frameSubtype: 'SREJ',
+        binaryTwo: '00001101',
+        modulo: 128
     },
     {
         frameType: "information",
-        framesubType: "information",
-        commandResponse: "command"
+        frameSubtype: "information",
+        commandOrResponse: "command",
+        modulo: 8
+    },
+    {
+        frameType: "information",
+        frameSubtype: "information",
+        commandOrResponse: "command",
+        modulo: 128
     }
 ];

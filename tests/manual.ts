@@ -1,25 +1,27 @@
 // type prefix required to run on bun
-import { NetConnectOpts } from 'net'
-import type { Repeater } from '../src'
-import { UIFrame, IncomingFrame, KissConnection, SABMEFrame, SABMFrame } from '../src'
+import { FrameFactory, KissConnection } from '../src'
+import { IncomingFrame } from '../src/frames/incoming'
 
 // ******************** SET YOUR TEST VARIABLES BELOW ********************
-const MY_CALLSIGN: string = 'KO4LCM'
-const MY_SSID: number = 0
-const THEIR_CALLSIGN: string = 'KO4LCM'
-const THEIR_SSID: number = 0
 
-const REPEATERS: Repeater[] = [
-	{
-		callsign: 'WH6CMO',
-		ssid: 10
-	}
-]
-
-const CONSTRUCTOR: NetConnectOpts = {
-    host: '127.0.0.1',
+const kc: KissConnection = new KissConnection({
+	host: '127.0.0.1',
     port: 8100
-}
+})
+
+const ff: FrameFactory = new FrameFactory({
+	kissConnection: kc,
+    destinationCallsign: 'KO4LCM',
+    destinationSsid: 0,
+    sourceCallsign: 'KO4LCM',
+    sourceSsid: 0,
+    repeaters: [
+		{
+			callsign: 'WH6CMO',
+			ssid: 10
+		}
+	]
+})
 
 
 // // ******************** DIFFERENT FRAME TYPES ********************
@@ -85,16 +87,8 @@ async function sendTest() {
 	printDivider()
 	console.time('sendTest')
 	try {
-		// const kc = new KissConnection({ mockModem: true })
-		const kc = new KissConnection(CONSTRUCTOR)
-		const frame = new SABMFrame({
-			kissConnection: kc,
-			destinationCallsign: THEIR_CALLSIGN,
-			destinationSsid: THEIR_SSID,
-			sourceCallsign: MY_CALLSIGN,
-			sourceSsid: MY_SSID,
-			repeaters: REPEATERS
-		})
+		// const frame = ff.ui(SERIALIZABLE_ARRAY)
+		const frame = ff.sabm()
 		if (kc.isSerial()) {
 			console.log(`Sending data to ${kc.getSerialPath()} at ${kc.getSerialBaudRate()} baud.... \x1b[32mPASS\x1b[0m`)
 		}
@@ -104,12 +98,13 @@ async function sendTest() {
 		else if (kc.isMockModem()) {
 			console.log('Sending data to mock modem... \x1b[32mPASS\x1b[0m')
 		}
-		kc.once('data', (data: IncomingFrame) => {
-			console.log(data.toJSON())
-			kc.removeAllListeners()
-			kc.close()
-		})
-		frame.send()
+		// kc.once('data', (data: IncomingFrame) => {
+		// 	console.log(data.toJSON())
+		// 	kc.removeAllListeners()
+		// 	kc.close()
+		// })
+		// frame.send()
+		console.log(frame.getEncoded())
 	}
 	catch (error) {
 		console.log('Send test... \x1b[31mFAIL\x1b[0m')

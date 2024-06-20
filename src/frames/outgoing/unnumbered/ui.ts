@@ -4,13 +4,11 @@ import { OutgoingAbstract } from "../outgoingabstract";
 export class UIFrame extends OutgoingAbstract implements mutableCommandOrResponse, hasPid, hasPayload {
     // use this.x in the constructor
     constructor(args: UIFrameConstructor) {
-        super(args, 'UI')
-        if (args.commandOrResponse) {
-            this.setCommandOrResponse(args.commandOrResponse)
-        }
-        this.setPollOrFinal(args.pollOrFinal ?? false)
+        super(args, 'UI', 8)
+        this.setCommandOrResponse(args.commandOrResponse)
+        .setPollOrFinal(args.pollOrFinal)
         .setPayload(args.payload)
-        .setPid(args.pid ?? 240)
+        .setPid(args.pid)
     }
 
     // use super.x in the getters and setters

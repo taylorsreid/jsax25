@@ -1,7 +1,7 @@
-import { hasModulo, hasReceivedSequence } from "types";
+import { hasModulo, hasReceivedSequence, mutableCommandOrResponse } from "types";
 import { OutgoingAbstract } from "../outgoingabstract";
 
-export abstract class SupervisoryAbstract extends OutgoingAbstract implements hasReceivedSequence, hasModulo {
+export abstract class SupervisoryAbstract extends OutgoingAbstract implements hasReceivedSequence, hasModulo, mutableCommandOrResponse {
 
     public getReceivedSequence(): number {
         return super.getReceivedSequence()
@@ -15,6 +15,13 @@ export abstract class SupervisoryAbstract extends OutgoingAbstract implements ha
     }
     public setModulo(modulo: 8 | 128): this {
         return super.setModulo(modulo)
+    }
+
+    public getCommandOrResponse(): "command" | "response" {
+        return super.getCommandOrResponse()
+    }
+    public setCommandOrResponse(commandOrResponse: "command" | "response"): this {
+        return super.setCommandOrResponse(commandOrResponse)
     }
     
 }

@@ -1,11 +1,11 @@
 import { OutgoingAbstract } from "../outgoingabstract";
-import { OutgoingConstructor, mutableCommandOrResponse } from "types";
+import { XIDFrameConstructor, mutableCommandOrResponse } from "types";
 
 
 export class XIDFrame extends OutgoingAbstract implements mutableCommandOrResponse {
 
-    constructor(args: OutgoingConstructor) {
-        super(args, 'XID')
+    constructor(args: XIDFrameConstructor) {
+        super(args, 'XID', 8)
         this.setPayload([
             132, // see AX.25 documentation 4.3.3.7 Exchange Identification (XID) Frame, 132 evaluates to half duplex only
             0, // all bits reserved by documentation but never implemented
@@ -21,6 +21,7 @@ export class XIDFrame extends OutgoingAbstract implements mutableCommandOrRespon
 
             // TODO: fix this? don't have any nearby digis that actually support this it seems like
         ])
+        .setCommandOrResponse(args.commandOrResponse)
     }
 
     public setCommandOrResponse(commandOrResponse: "command" | "response"): this {
