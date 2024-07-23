@@ -3,7 +3,7 @@ import type { IFrameType, FrameType, Repeater, SFrameType, UFrameType } from "..
 export abstract class BaseAbstract {
     protected abstract frameSubtype: UFrameType | SFrameType | IFrameType | undefined
     protected abstract frameType: FrameType | undefined
-    protected abstract destinationCallsign: string | undefined
+    protected abstract _destinationCallsign: string | undefined
     protected abstract destinationSsid: number | undefined
     protected abstract destinationCommandBit: boolean | undefined
     protected abstract destinationReservedBitOne: boolean | undefined
@@ -22,7 +22,8 @@ export abstract class BaseAbstract {
     protected abstract payload: any | undefined
 
     // public abstract getters
-    public abstract getDestinationCallsign(): string
+    // public abstract getDestinationCallsign(): string
+    public abstract get destinationCallsign(): string;
     public abstract getDestinationSsid(): number
     public abstract isDestinationReservedBitOne(): boolean
     public abstract isDestinationReservedBitTwo(): boolean
@@ -42,5 +43,6 @@ export abstract class BaseAbstract {
     protected abstract getPayload(): any
     public abstract getEncoded(): number[]
     protected abstract setModulo(modulo: 8 | 128): this
+    public abstract getFrameSubtype(): UFrameType | SFrameType | IFrameType
 
 }

@@ -1,27 +1,30 @@
 // type prefix required to run on bun
-import { FrameFactory, KissConnection } from '../src'
-import { IncomingFrame } from '../src/frames/incoming'
+import { FrameFactory, IncomingFrame, KissConnection, PacketSession } from '../src'
+import { OutgoingConstructor } from '../src/types'
 
 // ******************** SET YOUR TEST VARIABLES BELOW ********************
 
 const kc: KissConnection = new KissConnection({
-	host: '127.0.0.1',
-    port: 8100
+	txBaud: 1200,
+	tcpHost: '127.0.0.1',
+    tcpPort: 8100
 })
 
-const ff: FrameFactory = new FrameFactory({
+const ogc: OutgoingConstructor = {
 	kissConnection: kc,
-    destinationCallsign: 'KO4LCM',
-    destinationSsid: 0,
+    destinationCallsign: 'WH6CMO',
+    destinationSsid: 10,
     sourceCallsign: 'KO4LCM',
     sourceSsid: 0,
-    repeaters: [
-		{
-			callsign: 'WH6CMO',
-			ssid: 10
-		}
-	]
-})
+    // repeaters: [
+	// 	{
+	// 		callsign: 'WH6CMO',
+	// 		ssid: 10
+	// 	}
+	// ]
+}
+
+const ff: FrameFactory = new FrameFactory(ogc)
 
 
 // // ******************** DIFFERENT FRAME TYPES ********************
@@ -70,12 +73,8 @@ const SERIALIZABLE_ARRAY = [
 
 // ******************** SET WHICH TESTS TO RUN BY COMMENTING OUT LINES ********************
 
-// these tests does not require a radio
-// encodeDecodePacketTest()
-// decodeRepeatersTest()
-
-// all following tests require a radio
-sendTest()
+// sendTest()
+sessionTest()
 
 // // ******************** ACTUAL TEST FUNCTIONS ********************
 
@@ -83,32 +82,44 @@ function printDivider() {
 	console.log('\n****************************************************************************************************\n')
 }
 
-async function sendTest() {
+
+// function sendTest() {
+// 	printDivider()
+// 	console.time('sendTest')
+// 	try {
+// 		const frame = ff.ui(SERIALIZABLE_ARRAY)
+// 		if (kc.isSerial()) {
+// 			console.log(`Sending data to ${kc.getSerialPort()} at ${kc.getSerialBaud()} baud.... \x1b[32mPASS\x1b[0m`)
+// 		}
+// 		else if (kc.isTcp()) {
+// 			console.log(`Sending data to ${kc.getTcpHost()}:${kc.getTcpPort()}... \x1b[32mPASS\x1b[0m`)
+// 		}
+// 		else if (kc.isMock()) {
+// 			console.log('Sending data to mock modem... \x1b[32mPASS\x1b[0m')
+// 		}
+// 		kc.once('data', (data: IncomingFrame) => {
+// 			console.log(data.toJSON())
+// 			kc.close()
+// 		})
+// 		frame.send()
+// 	} catch (error) {
+// 		console.log('Send test... \x1b[31mFAIL\x1b[0m')
+// 		console.log(error)
+// 	}
+// 	console.timeEnd('sendTest')
+// }
+
+async function sessionTest() {
 	printDivider()
-	console.time('sendTest')
+	console.time('sessionTest')
 	try {
-		// const frame = ff.ui(SERIALIZABLE_ARRAY)
-		const frame = ff.sabm()
-		if (kc.isSerial()) {
-			console.log(`Sending data to ${kc.getSerialPath()} at ${kc.getSerialBaudRate()} baud.... \x1b[32mPASS\x1b[0m`)
-		}
-		else if (kc.isTcp()) {
-			console.log(`Sending data to ${kc.getTcpHost()}:${kc.getTcpPort()}... \x1b[32mPASS\x1b[0m`)
-		}
-		else if (kc.isMockModem()) {
-			console.log('Sending data to mock modem... \x1b[32mPASS\x1b[0m')
-		}
-		// kc.once('data', (data: IncomingFrame) => {
-		// 	console.log(data.toJSON())
-		// 	kc.removeAllListeners()
-		// 	kc.close()
-		// })
-		// frame.send()
-		console.log(frame.getEncoded())
-	}
-	catch (error) {
-		console.log('Send test... \x1b[31mFAIL\x1b[0m')
+		const session: PacketSession = new PacketSession(ogc)
+		await session.connect()
+		await session.send([SERIALIZABLE_ARRAY, SERIALIZABLE_ARRAY, SERIALIZABLE_ARRAY])
+		await session.disconnect()
+	} catch (error) {
+		console.log('Session test... \x1b[31mFAIL\x1b[0m')
 		console.log(error)
 	}
-	console.timeEnd('sendTest')
+	console.timeEnd('sessionTest')
 }

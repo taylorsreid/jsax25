@@ -9,7 +9,7 @@ export abstract class OutgoingAbstract extends BaseAbstract {
     protected readonly frameSubtype: IFrameType | UFrameType | SFrameType
     protected readonly frameType: FrameType
     protected kissConnection: KissConnection
-    protected destinationCallsign: string
+    protected _destinationCallsign: string
     protected destinationSsid: number
     protected destinationCommandBit: boolean;
     protected destinationReservedBitOne: boolean;
@@ -28,6 +28,8 @@ export abstract class OutgoingAbstract extends BaseAbstract {
     protected sendSequence: number | undefined
     protected pid: number | undefined;
     protected payload: any | undefined
+    protected encoded: number[]
+    protected encodedIsFresh: boolean
 
     constructor(args: OutgoingConstructor, frameSubtype: IFrameType | UFrameType | SFrameType, modulo: 8 | 128) {
         
@@ -60,6 +62,7 @@ export abstract class OutgoingAbstract extends BaseAbstract {
             .setRepeaters(args?.repeaters ?? [])
             .setModulo(modulo)
             .pollOrFinal ??= false // prevent undefined errors
+            this.encodedIsFresh = true
     }
 
     protected static encodeAddressField(callsign: string, commandOrHasBeenRepeated: boolean, reservedBitOne: boolean, reservedBitTwo: boolean, ssid: number, finalAddress: boolean): number[] {
@@ -138,7 +141,7 @@ export abstract class OutgoingAbstract extends BaseAbstract {
     protected setModulo(modulo: 8 | 128): this {
 
         const found = controlFieldCombinations.find((cc) => {
-            return cc.frameSubtype === this.frameSubtype && cc.modulo === modulo
+            return cc.frameSubtype === this.getFrameSubtype() && cc.modulo === modulo
         })
 
         if (found) {
@@ -152,6 +155,7 @@ export abstract class OutgoingAbstract extends BaseAbstract {
             if (found.pollOrFinal) {
                 this.setPollOrFinal(found.pollOrFinal)
             }
+            this.encodedIsFresh = false
         }
 
         return this
@@ -163,11 +167,15 @@ export abstract class OutgoingAbstract extends BaseAbstract {
     }
     public setKissConnection(kissConnection: KissConnection): this {
         this.kissConnection = kissConnection
+        // doesn't effect encoded frame
         return this
     }
 
-    public getDestinationCallsign(): string {
-        return this.destinationCallsign
+    // public getDestinationCallsign(): string {
+    //     return this._destinationCallsign
+    // }
+    public get destinationCallsign(): string {
+        return this._destinationCallsign
     }
     public setDestinationCallsign(callsign: string): this {
         // pre flight check
@@ -175,7 +183,8 @@ export abstract class OutgoingAbstract extends BaseAbstract {
             throw new Error(`'${callsign}' is not a valid destination callsign. Callsigns must have a length from 1 to 6 characters inclusive.`)
         }
         // uppercase per AX.25 spec, trim for prettiness, will repad at encode time
-        this.destinationCallsign = callsign.toUpperCase().trim()
+        this._destinationCallsign = callsign.toUpperCase().trim()
+        this.encodedIsFresh = false
         return this
     }
 
@@ -188,6 +197,7 @@ export abstract class OutgoingAbstract extends BaseAbstract {
             throw new Error(`${ssid} is not a valid destination SSID. SSIDs must be between 0 and 15 inclusive.`)
         }
         this.destinationSsid = ssid
+        this.encodedIsFresh = false
         return this
     }
 
@@ -196,6 +206,7 @@ export abstract class OutgoingAbstract extends BaseAbstract {
     }
     public setDestinationReservedBitOne(on: boolean): this {
         this.destinationReservedBitOne = on
+        this.encodedIsFresh = false
         return this
     }
 
@@ -204,6 +215,7 @@ export abstract class OutgoingAbstract extends BaseAbstract {
     }
     public setDestinationReservedBitTwo(on: boolean): this {
         this.destinationReservedBitTwo = on
+        this.encodedIsFresh = false
         return this
     }
 
@@ -217,6 +229,7 @@ export abstract class OutgoingAbstract extends BaseAbstract {
         }
         // uppercase per AX.25 spec, trim for prettiness, will repad at encode time
         this.sourceCallsign = callsign.toUpperCase().trim()
+        this.encodedIsFresh = false
         return this
     }
 
@@ -228,8 +241,8 @@ export abstract class OutgoingAbstract extends BaseAbstract {
         if (ssid < 0 || ssid > 15) {
             throw new Error(`${ssid} is not a valid source SSID. SSIDs must be between 0 and 15 inclusive.`)
         }
-
         this.sourceSsid = ssid
+        this.encodedIsFresh = false
         return this
     }
 
@@ -238,6 +251,7 @@ export abstract class OutgoingAbstract extends BaseAbstract {
     }
     public setSourceReservedBitOne(on: boolean): this {
         this.sourceReservedBitOne = on
+        this.encodedIsFresh = false
         return this
     }
 
@@ -246,6 +260,7 @@ export abstract class OutgoingAbstract extends BaseAbstract {
     }
     public setSourceReservedBitTwo(on: boolean): this {
         this.sourceReservedBitTwo = on
+        this.encodedIsFresh = false
         return this
     }
 
@@ -268,6 +283,7 @@ export abstract class OutgoingAbstract extends BaseAbstract {
             this.destinationCommandBit = false
             this.sourceCommandBit = true
         }
+        this.encodedIsFresh = false
         return this
     }
     public isCommand(): boolean {
@@ -289,6 +305,7 @@ export abstract class OutgoingAbstract extends BaseAbstract {
             r.callsign = r.callsign.toUpperCase() // only repair this, others can be defaulted at encode time because they're not critical
             return r
         })
+        this.encodedIsFresh = false
         return this
     }
     // convenience method to push a repeater
@@ -296,6 +313,7 @@ export abstract class OutgoingAbstract extends BaseAbstract {
         // decided not to truncate since some people are still doing more than 2 repeaters hops even though it's against AX.25 spec, plus it's a stupid rule
         repeater.callsign = repeater.callsign.toUpperCase()
         this.repeaters.push(repeater)
+        this.encodedIsFresh = false
         return this
     }
 
@@ -309,7 +327,6 @@ export abstract class OutgoingAbstract extends BaseAbstract {
     protected getReceivedSequence(): number { // Doesn't exist on some frames. ! because this method is only exposed in child classes where it is defined
         return this.receivedSequence!
     }
-    // protected abstract getReceivedSequence(): number
     protected setReceivedSequence(receivedSequence: number): this {
         if (this.getModulo() === 8 && (receivedSequence < 0 || receivedSequence > 7)) {
             throw new Error(`Received sequence ${receivedSequence} must be between 0 and 7 inclusive when set to modulo 8.`)
@@ -318,6 +335,7 @@ export abstract class OutgoingAbstract extends BaseAbstract {
             throw new Error(`Received sequence ${receivedSequence} must be between 0 and 127 inclusive when set to modulo 128.`)
         }
         this.receivedSequence = receivedSequence
+        this.encodedIsFresh = false
         return this
     }
 
@@ -326,6 +344,7 @@ export abstract class OutgoingAbstract extends BaseAbstract {
     }
     public setPollOrFinal(pollOrFinal: boolean): this { // not mutable on some frames
         this.pollOrFinal = pollOrFinal
+        this.encodedIsFresh = false
         return this
     }
 
@@ -340,6 +359,7 @@ export abstract class OutgoingAbstract extends BaseAbstract {
             throw new Error(`Send sequence ${sendSequence} must be between 0 and 127 inclusive when set to modulo 128.`)
         }
         this.sendSequence = sendSequence
+        this.encodedIsFresh = false
         return this
     }
 
@@ -351,6 +371,7 @@ export abstract class OutgoingAbstract extends BaseAbstract {
             throw new Error(`PID ${pid} is invalid. PID must be a positive number.`)
         }
         this.pid = pid
+        this.encodedIsFresh = false
         return this
     }
 
@@ -360,10 +381,20 @@ export abstract class OutgoingAbstract extends BaseAbstract {
     /** Set the payload/body of your packet frame. Can be anything serializable, ex. a string, number, JSON, etc */
     protected setPayload(payload: any): this { // Doesn't exist on some frames.
         this.payload = payload
+        this.encodedIsFresh = false
         return this
     }
 
+    public getFrameSubtype(): UFrameType | SFrameType | IFrameType {
+        return this.frameSubtype
+    }
+
     public getEncoded(): number[] {
+
+        // avoid reencoding if it's not necessary
+        if (this.encodedIsFresh && typeof this.encoded !== 'undefined') {
+            return this.encoded
+        }
 
         let encoded: number[] = []
 
@@ -421,12 +452,12 @@ export abstract class OutgoingAbstract extends BaseAbstract {
             encoded.push(ctl)
         }
 
-        if (typeof this.pid !== 'undefined' && (this.frameSubtype === 'information' || this.frameSubtype === 'UI')) {
+        if (typeof this.pid !== 'undefined' && (this.getFrameSubtype() === 'information' || this.getFrameSubtype() === 'UI')) {
             encoded.push(this.pid)
         }
 
         //
-        if (typeof this.payload !== 'undefined' && this.frameSubtype !== 'XID') {
+        if (typeof this.payload !== 'undefined' && this.getFrameSubtype() !== 'XID') {
 
             let stringPayload: string
             if (typeof this.payload !== 'string') {
@@ -441,7 +472,7 @@ export abstract class OutgoingAbstract extends BaseAbstract {
             })
 
         }
-        else if (this.frameSubtype === 'XID') { // the xid payload is just raw numbers
+        else if (this.getFrameSubtype() === 'XID') { // the xid payload is just raw numbers
             encoded.push(...this.payload)
         }
 

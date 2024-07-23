@@ -4,7 +4,7 @@ import type { FrameType as MainFrameType, Repeater, SFrameType, UFrameType, IFra
 import { controlFieldCombinations } from './controlFieldCombinations';
 
 export class IncomingFrame extends BaseAbstract {
-    protected destinationCallsign: string | undefined;
+    protected _destinationCallsign: string | undefined;
     protected destinationSsid: number | undefined;
     protected destinationCommandBit: boolean | undefined;
     protected destinationReservedBitOne: boolean | undefined;
@@ -65,10 +65,10 @@ export class IncomingFrame extends BaseAbstract {
 
     /** Get the destination amateur radio callsign. */
     public getDestinationCallsign(): string {
-        if (typeof this.destinationCallsign === 'undefined') {
-            this.destinationCallsign = IncomingFrame.decodeCallsign(this.encoded.slice(1, 7))
+        if (typeof this._destinationCallsign === 'undefined') {
+            this._destinationCallsign = IncomingFrame.decodeCallsign(this.encoded.slice(1, 7))
         }
-        return this.destinationCallsign
+        return this._destinationCallsign
     }
 
     public isDestinationCommandBit(): boolean {

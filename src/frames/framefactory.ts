@@ -129,7 +129,7 @@ export class FrameFactory {
         return new XIDFrame(c)
     }
 
-    public i(payload: any, receivedSequence: number, pollOrFinal: boolean, sendSequence: number, modulo: 8 | 128 = 8, pid: number = 240): IFrame {
+    public info(payload: any, receivedSequence: number, pollOrFinal: boolean, sendSequence: number, modulo: 8 | 128 = 8, pid: number = 240): IFrame {
         const c: IFrameConstructor = this.baseConstructor as IFrameConstructor
         c.payload = payload
         c.receivedSequence = receivedSequence

@@ -36,7 +36,7 @@ export class IFrame extends OutgoingAbstract implements hasPid, hasPayload, hasR
     }
 
     public getSendSequence(): number {
-        return super.getReceivedSequence() as number
+        return super.getSendSequence()
     }
 
     public setReceivedSequence(receivedSequence: number): this {
