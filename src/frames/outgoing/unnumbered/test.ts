@@ -1,22 +1,30 @@
-import type { TestFrameConstructor, hasPayload, mutableCommandOrResponse } from "types";
-import { OutgoingAbstract } from "../outgoingabstract";
+import type { hasPayload, mutableCommandOrResponse } from "../../../misc.js";
+import { OutgoingAbstract, type OutgoingConstructor } from "../outgoingabstract.js";
+
+export interface TestFrameConstructor extends OutgoingConstructor {
+    /**  */
+    commandOrResponse?: 'command' | 'response'
+    payload?: any
+}
 
 export class TESTFrame extends OutgoingAbstract implements hasPayload, mutableCommandOrResponse {
 
     constructor(args: TestFrameConstructor) {
-        super(args, 'TEST', 8)
-        this.setPayload(args.payload)
-    }
-    
-    public getPayload(): any {
-        return super.getPayload()
-    }
-    public setPayload(payload: any): this {
-        return super.setPayload(payload)
+        super(args, 'TEST')
     }
 
-    public setCommandOrResponse(commandOrResponse: "command" | "response"): this {
-        return super.setCommandOrResponse(commandOrResponse)
+    public get commandOrResponse(): 'command' | 'response' {
+        return super.commandOrResponse
+    }
+    public set commandOrResponse(commandOrResponse: "command" | "response") {
+        super.commandOrResponse = commandOrResponse
+    }
+    
+    public get payload(): any {
+        return super.payload
+    }
+    public set payload(payload: any) {
+        super.payload = payload
     }
     
 }

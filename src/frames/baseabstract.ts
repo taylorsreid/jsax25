@@ -1,48 +1,59 @@
-import type { IFrameType, FrameType, Repeater, SFrameType, UFrameType } from "../types"
+import type { Repeater } from "../misc.js"
+
+export type FrameType = 'information' | 'supervisory' | 'unnumbered'
+export type SFrameType = 'RR' | 'RNR' | 'REJ' | 'SREJ'
+export type UFrameType = 'SABME' | 'SABM' | 'DISC' | 'DM' | 'UA' | 'UI' | 'FRMR' | 'XID' | 'TEST'
+export type IFrameType = 'I'
 
 export abstract class BaseAbstract {
-    protected abstract frameSubtype: UFrameType | SFrameType | IFrameType | undefined
-    protected abstract frameType: FrameType | undefined
-    protected abstract _destinationCallsign: string | undefined
-    protected abstract destinationSsid: number | undefined
-    protected abstract destinationCommandBit: boolean | undefined
-    protected abstract destinationReservedBitOne: boolean | undefined
-    protected abstract destinationReservedBitTwo: boolean | undefined
-    protected abstract sourceCallsign: string | undefined
-    protected abstract sourceSsid: number | undefined
-    protected abstract sourceCommandBit: boolean | undefined
-    protected abstract sourceReservedBitOne: boolean | undefined
-    protected abstract sourceReservedBitTwo: boolean | undefined
-    protected abstract repeaters: Repeater[] | undefined
-    protected modulo: 8 | 128
-    // protected abstract receivedSequence: number | undefined
-    // protected abstract pollOrFinal: boolean | undefined
-    // protected abstract sendSequence: number | undefined
+    protected abstract frameType: FrameType
+    public abstract frameSubtype: UFrameType | SFrameType | IFrameType
+    public abstract destinationCallsign: string
+    public abstract destinationSsid: number
+    protected abstract destinationCommandBit: boolean // not serialized to JSON
+    public abstract destinationReservedBitOne: boolean
+    public abstract destinationReservedBitTwo: boolean
+    public abstract sourceCallsign: string
+    public abstract sourceSsid: number
+    protected abstract sourceCommandBit: boolean // not serialized to JSON
+    public abstract sourceReservedBitOne: boolean
+    public abstract sourceReservedBitTwo: boolean
+    public abstract commandOrResponse: 'command' | 'response' | 'legacy'
+    public abstract isCommand: boolean
+    public abstract isResponse: boolean
+    public abstract isLegacy: boolean
+    public abstract repeaters: Repeater[]
+    public abstract modulo: 8 | 128
+    protected abstract receivedSequence: number | undefined
+    public abstract pollOrFinal: boolean
+    protected abstract sendSequence: number | undefined
     protected abstract pid: number | undefined
     protected abstract payload: any | undefined
+    public abstract encoded: number[]
 
-    // public abstract getters
-    // public abstract getDestinationCallsign(): string
-    public abstract get destinationCallsign(): string;
-    public abstract getDestinationSsid(): number
-    public abstract isDestinationReservedBitOne(): boolean
-    public abstract isDestinationReservedBitTwo(): boolean
-    public abstract getSourceCallsign(): string
-    public abstract getSourceSsid(): number
-    public abstract isSourceReservedBitOne(): boolean
-    public abstract isSourceReservedBitTwo(): boolean
-    public abstract getCommandOrResponse(): 'command' | 'response' | 'legacy'
-    public abstract isCommand(): boolean
-    public abstract isResponse(): boolean
-    public abstract getRepeaters(): Repeater[]
-    protected abstract getModulo(): 8 | 128 | undefined
-    protected abstract getReceivedSequence(): number | string | undefined // undefined on incoming frame if it doesn't have a received sequence
-    public abstract isPollOrFinal(): boolean
-    protected abstract getSendSequence(): number | string | undefined // undefined on incoming frame if it doesn't have a send sequence
-    protected abstract getPid(): number | undefined
-    protected abstract getPayload(): any
-    public abstract getEncoded(): number[]
-    protected abstract setModulo(modulo: 8 | 128): this
-    public abstract getFrameSubtype(): UFrameType | SFrameType | IFrameType
-
+    public toJSON() {
+        return {
+            frameType: this.frameType,
+            frameSubtype: this.frameSubtype,
+            destinationCallsign: this.destinationCallsign,
+            destinationSsid: this.destinationSsid,
+            destinationReservedBitOne: this.destinationReservedBitOne,
+            destinationReservedBitTwo: this.destinationReservedBitTwo,
+            sourceCallsign: this.sourceCallsign,
+            sourceSsid: this.sourceSsid,
+            sourceReservedBitOne: this.sourceReservedBitOne,
+            sourceReservedBitTwo: this.sourceReservedBitTwo,
+            commandOrResponse: this.commandOrResponse,
+            isCommand: this.isCommand,
+            isResponse: this.isResponse,
+            isLegacy: this.isLegacy,
+            repeaters: this.repeaters,
+            modulo: this.modulo,
+            receivedSequence: this.receivedSequence,
+            pollOrFinal: this.pollOrFinal,
+            sendSequence: this.sendSequence,
+            pid: this.pid,
+            payload: this.payload
+        }
+    }
 }

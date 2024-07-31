@@ -1,6 +1,10 @@
-// type prefix required to run on bun
-import { FrameFactory, IncomingFrame, KissConnection, PacketSession } from '../src'
-import { OutgoingConstructor } from '../src/types'
+import { setTimeout } from "timers/promises"
+import { DISCFrame, IncomingFrame, type OutgoingConstructor, TESTFrame, type TestFrameConstructor, UIFrame, type UIFrameConstructor } from "../src/frames/index.js"
+import { KissConnection } from "../src/kissconnection.js"
+import { PacketSession } from "../src/packetsession.js"
+import { TNC } from "../src/tnc.js"
+import { Session } from "inspector"
+
 
 // ******************** SET YOUR TEST VARIABLES BELOW ********************
 
@@ -9,26 +13,13 @@ const kc: KissConnection = new KissConnection({
 	tcpHost: '127.0.0.1',
     tcpPort: 8100
 })
-
-const ogc: OutgoingConstructor = {
-	kissConnection: kc,
-    destinationCallsign: 'WH6CMO',
-    destinationSsid: 10,
-    sourceCallsign: 'KO4LCM',
-    sourceSsid: 0,
-    // repeaters: [
-	// 	{
-	// 		callsign: 'WH6CMO',
-	// 		ssid: 10
-	// 	}
-	// ]
-}
-
-const ff: FrameFactory = new FrameFactory(ogc)
-
+const destinationCallsign: string = 'WH6CMO'
+const destinationSsid: number = 10
+const sourceCallsign: string = 'KO4LCM'
+const sourceSsid: number = 0
 
 // // ******************** DIFFERENT FRAME TYPES ********************
-const STRING: string = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Mauris vitae sapien mollis, hendrerit nulla sit amet, vehicula nunc.'
+const STRING: string = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Mauris vitae sapien mollis, hendrerit nulla sit amet, vehicula nunc. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Mauris vitae sapien mollis, hendrerit nulla sit amet, vehicula nunc. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Mauris vitae sapien mollis, hendrerit nulla sit amet, vehicula nunc. '
 const NUMBER: number = 86753.09
 const OBJECT: Object = { key: STRING }
 const STRING_ARRAY: string[] = STRING.split(' ')
@@ -73,53 +64,100 @@ const SERIALIZABLE_ARRAY = [
 
 // ******************** SET WHICH TESTS TO RUN BY COMMENTING OUT LINES ********************
 
+// listenTest()
 // sendTest()
-sessionTest()
+tncTest()
+// responseTest()
 
-// // ******************** ACTUAL TEST FUNCTIONS ********************
+// ******************** ACTUAL TEST FUNCTIONS ********************
 
 function printDivider() {
 	console.log('\n****************************************************************************************************\n')
 }
 
+function listenTest() {
+	printDivider()
+	kc.on('data', (frame) => {
+		console.log(frame.toJSON())
+	})
+}
 
-// function sendTest() {
-// 	printDivider()
-// 	console.time('sendTest')
-// 	try {
-// 		const frame = ff.ui(SERIALIZABLE_ARRAY)
-// 		if (kc.isSerial()) {
-// 			console.log(`Sending data to ${kc.getSerialPort()} at ${kc.getSerialBaud()} baud.... \x1b[32mPASS\x1b[0m`)
-// 		}
-// 		else if (kc.isTcp()) {
-// 			console.log(`Sending data to ${kc.getTcpHost()}:${kc.getTcpPort()}... \x1b[32mPASS\x1b[0m`)
-// 		}
-// 		else if (kc.isMock()) {
-// 			console.log('Sending data to mock modem... \x1b[32mPASS\x1b[0m')
-// 		}
-// 		kc.once('data', (data: IncomingFrame) => {
-// 			console.log(data.toJSON())
-// 			kc.close()
-// 		})
-// 		frame.send()
-// 	} catch (error) {
-// 		console.log('Send test... \x1b[31mFAIL\x1b[0m')
-// 		console.log(error)
-// 	}
-// 	console.timeEnd('sendTest')
-// }
 
-async function sessionTest() {
+function sendTest() {
+	printDivider()
+	console.time('sendTest')
+	try {
+		const frame = new TESTFrame({
+			destinationCallsign: destinationCallsign,
+			destinationSsid: destinationSsid,
+			sourceCallsign: sourceCallsign,
+			sourceSsid: sourceSsid,
+			payload: STRING
+		})
+		if (kc.isSerial) {
+			console.log(`Sending data to ${kc.serialPort} at ${kc.serialBaud} baud.... \x1b[32mPASS\x1b[0m`)
+		}
+		else if (kc.isTcp) {
+			console.log(`Sending data to ${kc.tcpHost}:${kc.tcpPort}... \x1b[32mPASS\x1b[0m`)
+		}
+		kc.once('data', (data: IncomingFrame) => {
+			console.log(data.toJSON())
+			kc.end()
+		})
+		frame.send()
+	} catch (error) {
+		console.log('Send test... \x1b[31mFAIL\x1b[0m')
+		console.log(error)
+	}
+	console.timeEnd('sendTest')
+}
+
+async function tncTest() {
 	printDivider()
 	console.time('sessionTest')
 	try {
-		const session: PacketSession = new PacketSession(ogc)
-		await session.connect()
-		await session.send([SERIALIZABLE_ARRAY, SERIALIZABLE_ARRAY, SERIALIZABLE_ARRAY])
+
+		const tnc: TNC = new TNC({
+			kissConnection: kc,
+			sourceCallsign: sourceCallsign,
+			sourceSsid: sourceSsid
+		})
+
+		const session: PacketSession = await tnc.connect({
+			destinationCallsign: destinationCallsign,
+			destinationSsid: destinationSsid
+		})
+
+		// session.send(STRING)
+
+		await setTimeout(5_000)
+
 		await session.disconnect()
+		
 	} catch (error) {
+		new DISCFrame({
+			kissConnection: kc,
+			destinationCallsign: destinationCallsign,
+			destinationSsid: destinationSsid,
+			sourceCallsign: sourceCallsign,
+			sourceSsid: sourceSsid
+		}).send()
 		console.log('Session test... \x1b[31mFAIL\x1b[0m')
 		console.log(error)
 	}
 	console.timeEnd('sessionTest')
+}
+
+function responseTest() {
+	// const c: UIFrameConstructor = ogc as UIFrameConstructor
+	// c.payload = 'hello world'
+	const encoded = new UIFrame({
+		destinationCallsign: destinationCallsign,
+		destinationSsid: destinationSsid,
+		sourceCallsign: sourceCallsign,
+		sourceSsid: sourceSsid,
+		payload: 'hello world'
+	}).encoded
+
+	console.log(new IncomingFrame(encoded).IFrame('goodbye world', 1, 2).toJSON())
 }

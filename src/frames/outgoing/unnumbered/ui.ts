@@ -1,34 +1,48 @@
-import { UIFrameConstructor, hasPayload, hasPid, mutableCommandOrResponse } from "types";
-import { OutgoingAbstract } from "../outgoingabstract";
+import type { hasPayload, hasPid, mutableCommandOrResponse, mutablePollOrFinal } from "../../../misc.js";
+import { OutgoingAbstract, type OutgoingConstructor } from "../outgoingabstract.js";
 
-export class UIFrame extends OutgoingAbstract implements mutableCommandOrResponse, hasPid, hasPayload {
+export interface UIFrameConstructor extends OutgoingConstructor {
+    commandOrResponse?: 'command' | 'response'
+    pollOrFinal?: boolean
+    pid?: number
+    payload: any
+}
+
+export class UIFrame extends OutgoingAbstract implements mutableCommandOrResponse, mutablePollOrFinal, hasPid, hasPayload {
     // use this.x in the constructor
     constructor(args: UIFrameConstructor) {
-        super(args, 'UI', 8)
-        this.setCommandOrResponse(args.commandOrResponse)
-        .setPollOrFinal(args.pollOrFinal)
-        .setPayload(args.payload)
-        .setPid(args.pid)
+        super(args, 'UI')
     }
 
     // use super.x in the getters and setters
+    // all setters must have a getter or the property will be returned as undefined
 
-    public setCommandOrResponse(commandOrResponse: "command" | "response"): this {
-        return super.setCommandOrResponse(commandOrResponse)
+    public get commandOrResponse(): 'command' | 'response' {
+        return super.commandOrResponse
     }
-
-    public getPid(): number {
-        return super.getPid()!
-    }
-    public setPid(pid: number): this {
-        return super.setPid(pid)
+    public set commandOrResponse(commandOrResponse: "command" | "response") {
+        super.commandOrResponse = commandOrResponse
     }
 
-    public getPayload(): any {
-        return super.getPayload()
+    public get pollOrFinal(): boolean {
+        return super.pollOrFinal
     }
-    public setPayload(payload: any): this {
-        return super.setPayload(payload)
+    public set pollOrFinal(pollOrFinal: boolean) {
+        super.pollOrFinal = pollOrFinal
+    }
+
+    public get pid(): number {
+        return super.pid!
+    }
+    public set pid(pid: number) {
+        super.pid = pid
+    }
+
+    public get payload(): any {
+        return super.payload
+    }
+    public set payload(payload: any) {
+        super.payload = payload
     }
     
 }

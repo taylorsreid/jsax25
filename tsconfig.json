@@ -3,7 +3,7 @@
         "module": "NodeNext",
         "esModuleInterop": true,
         "allowSyntheticDefaultImports": true,
-        "target": "es6",
+        "target": "ESNext",
         "noImplicitAny": true,
         "noImplicitReturns": true,
         "resolveJsonModule": true,
@@ -16,7 +16,8 @@
         "rootDir": "./src",
         "strictNullChecks": true,
         "noUnusedLocals": true,
-        "types": []
+        "types": [],
+        "verbatimModuleSyntax": true
     },
     "include": ["src/**/*"]
 }

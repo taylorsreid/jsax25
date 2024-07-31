@@ -1,11 +1,12 @@
-import { SFrameConstructor } from "types";
-import { SupervisoryAbstract } from "./supervisoryabstract";
+import { SupervisoryAbstract, type SFrameConstructor } from "./supervisoryabstract.js";
+
+export interface SREJFrameConstructor extends SFrameConstructor {
+    /** In an SREJ frame, this indicates whether to acknowledge previous frames up to N(R) - 1 inclusive. */
+    pollOrFinal: boolean
+}
 
 export class SREJFrame extends SupervisoryAbstract {
-    constructor(args: SFrameConstructor) {
-        super(args, 'SREJ', args.modulo)
-        this.setReceivedSequence(args.receivedSequence)
-        .setPollOrFinal(args.pollOrFinal)
-        .setCommandOrResponse(args.commandOrResponse)
+    constructor(args: SREJFrameConstructor) {
+        super(args, 'SREJ')
     }
 }

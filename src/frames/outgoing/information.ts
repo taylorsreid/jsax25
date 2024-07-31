@@ -1,58 +1,61 @@
-import type { IFrameConstructor,  hasModulo, hasPayload, hasPid, hasReceivedSequence, hasSendSequence, } from "types";
-import { OutgoingAbstract } from "./outgoingabstract"
+import type { mutableModulo, hasPayload, hasPid, hasReceivedSequence, hasSendSequence, mutablePollOrFinal, } from "../../misc.js";
+import { OutgoingAbstract, type OutgoingConstructor } from "./outgoingabstract.js";
 
-export class IFrame extends OutgoingAbstract implements hasPid, hasPayload, hasReceivedSequence, hasSendSequence, hasModulo {
-    protected receivedSequence: number;
-    protected sendSequence: number;
+export interface IFrameConstructor extends OutgoingConstructor {
+    modulo?: 8 | 128
+    receivedSequence: number
+    pollOrFinal?: boolean
+    sendSequence: number
+    pid?: number
+    payload: any
+}
+
+export class IFrame extends OutgoingAbstract implements mutablePollOrFinal, hasPid, hasPayload, hasReceivedSequence, hasSendSequence, mutableModulo {
 
     constructor(args: IFrameConstructor) {
-        super(args, 'information', args.modulo)
-        this.setSendSequence(args.sendSequence)
-            .setPollOrFinal(args.pollOrFinal)
-            .setReceivedSequence(args.receivedSequence)
-            .setPayload(args.payload)
-            .setPid(args.pid)
+        super(args, 'I')
     }
 
-    public getPid(): number {
-        return super.getPid()!
+    public get pollOrFinal(): boolean {
+        return super.pollOrFinal
+    }
+    public set pollOrFinal(pollOrFinal: boolean) {
+        super.pollOrFinal = pollOrFinal
     }
 
-    public setPid(pid: number): this {
-        return super.setPid(pid)
+    public get modulo(): 8 | 128 {
+        return super.modulo
+    }
+    public set modulo(modulo: 8 | 128) {
+        super.modulo = modulo
     }
 
-    public getPayload(): any {
-        return super.getPayload()
+    public get receivedSequence(): number {
+        return super.receivedSequence!
+    }
+    public set receivedSequence(receivedSequence: number) {
+        super.receivedSequence = receivedSequence
     }
 
-    public setPayload(payload: any): this {
-        this.payload = payload
-        return this
+    public get sendSequence(): number {
+        return super.sendSequence!
+    }
+    public set sendSequence(sendSequence: number) {
+        super.sendSequence = sendSequence
     }
 
-    public getReceivedSequence(): number {
-        return super.getReceivedSequence()
+    public get pid(): number {
+        return super.pid!
+    }
+    public set pid(pid: number) {
+        super.pid = pid
     }
 
-    public getSendSequence(): number {
-        return super.getSendSequence()
+    public get payload(): any {
+        return super.payload
     }
-
-    public setReceivedSequence(receivedSequence: number): this {
-        return super.setReceivedSequence(receivedSequence)
-    }
-
-    public setSendSequence(sendSequence: number): this {
-        return super.setSendSequence(sendSequence)
-    }
-
-    public getModulo(): 8 | 128 {
-        return super.getModulo()
-    }
-
-    public setModulo(modulo: 8 | 128): this {
-        return super.setModulo(modulo)
+    public set payload(payload: any) {
+        super.payload = payload
     }
 
 }

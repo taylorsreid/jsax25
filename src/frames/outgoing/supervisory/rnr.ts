@@ -1,11 +1,7 @@
-import { SFrameConstructor } from "types";
-import { SupervisoryAbstract } from "./supervisoryabstract";
+import { SupervisoryAbstract, type SFrameConstructor } from "./supervisoryabstract.js";
 
 export class RNRFrame extends SupervisoryAbstract {
     constructor(args: SFrameConstructor) {
-        super(args, 'RNR', args.modulo)
-        this.setReceivedSequence(args.receivedSequence)
-        .setPollOrFinal(args.pollOrFinal)
-        .setCommandOrResponse(args.commandOrResponse)
+        super(args, 'RNR')
     }
 }

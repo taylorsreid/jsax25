@@ -1,8 +1,7 @@
-import type { OutgoingConstructor } from "../../../types"
-import { OutgoingAbstract } from "../outgoingabstract"
+import { OutgoingAbstract, type OutgoingConstructor } from "../outgoingabstract.js";
 
 export class SABMEFrame extends OutgoingAbstract {
     constructor(args: OutgoingConstructor) {
-        super(args, 'SABME', 8)
+        super(args, 'SABME')
     }
 }

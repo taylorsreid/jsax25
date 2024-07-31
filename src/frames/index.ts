@@ -1,21 +1,21 @@
-export { FrameFactory } from './framefactory'
-
 // supervisory
-export { REJFrame } from './outgoing/supervisory/rej'
-export { RNRFrame } from './outgoing/supervisory/rnr'
-export { RRFrame } from './outgoing/supervisory/rr'
-export { SREJFrame } from './outgoing/supervisory/srej'
+export { type SFrameConstructor } from './outgoing/supervisory/supervisoryabstract.js'
+export { REJFrame } from './outgoing/supervisory/rej.js'
+export { RNRFrame } from './outgoing/supervisory/rnr.js'
+export { RRFrame } from './outgoing/supervisory/rr.js'
+export { SREJFrame, type SREJFrameConstructor } from './outgoing/supervisory/srej.js'
 
 // unnumbered
-export { DISCFrame } from './outgoing/unnumbered/disc'
-export { DMFrame } from './outgoing/unnumbered/dm'
-export { SABMFrame } from './outgoing/unnumbered/sabm'
-export { SABMEFrame } from './outgoing/unnumbered/sabme'
-export { TESTFrame } from './outgoing/unnumbered/test'
-export { UAFrame } from './outgoing/unnumbered/ua'
-export { UIFrame } from './outgoing/unnumbered/ui'
-export { XIDFrame } from './outgoing/unnumbered/xid'
+export { DISCFrame } from './outgoing/unnumbered/disc.js'
+export { DMFrame } from './outgoing/unnumbered/dm.js'
+export { SABMFrame } from './outgoing/unnumbered/sabm.js'
+export { SABMEFrame } from './outgoing/unnumbered/sabme.js'
+export { TESTFrame, type TestFrameConstructor } from './outgoing/unnumbered/test.js'
+export { UAFrame } from './outgoing/unnumbered/ua.js'
+export { UIFrame, type UIFrameConstructor } from './outgoing/unnumbered/ui.js'
+export { XIDFrame, type XIDFrameConstructor } from './outgoing/unnumbered/xid.js'
 
-export { IFrame } from './outgoing/information'
-
-export { IncomingFrame } from './incoming'
+// misc
+export { IFrame, type IFrameConstructor } from './outgoing/information.js'
+export { IncomingFrame } from './incoming.js'
+export { type OutgoingConstructor } from './outgoing/outgoingabstract.js'
