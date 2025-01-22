@@ -1,30 +1,15 @@
-import type { mutableCommandOrResponse } from "../../../misc.js";
-import { OutgoingAbstract, type OutgoingConstructor } from "../outgoingabstract.js";
+import type { mutableCommandOrResponse, mutablePollOrFinal } from "../../../misc.js";
+import { OutboundFrame, type OutboundConstructor } from "../outbound.js";
 
-export interface XIDFrameConstructor extends OutgoingConstructor {
+export interface XIDFrameConstructor extends OutboundConstructor {
     commandOrResponse?: 'command' | 'response'
     pollOrFinal?: boolean
 }
 
-export class XIDFrame extends OutgoingAbstract implements mutableCommandOrResponse {
+export class XIDFrame extends OutboundFrame implements mutableCommandOrResponse, mutablePollOrFinal {
 
     constructor(args: XIDFrameConstructor) {
         super(args, 'XID')
-        this.payload = [
-            132, // see AX.25 documentation 4.3.3.7 Exchange Identification (XID) Frame, 132 evaluates to half duplex only
-            0, // all bits reserved by documentation but never implemented
-            97, // supports rejc and srej
-            53, // supports modulo 8 and modulo 128
-            64, // required by spec, not mutable
-            2048, // max I fields length tx 2048 bits === 256 bytes
-            2048, // max I fields length rx, ''
-            32, // max window size frames tx
-            32, // max window size frames rx
-            3000, // default acknowledge timer
-            10 // default retries is 10
-
-            // TODO: fix this? don't have any nearby digis that actually support this it seems like
-        ]
     }
 
     public get commandOrResponse(): 'command' | 'response' {
@@ -34,12 +19,11 @@ export class XIDFrame extends OutgoingAbstract implements mutableCommandOrRespon
         super.commandOrResponse = commandOrResponse
     }
 
-    // readonly on this frame type
-    public get payload(): any {
-        return super.payload
+    public get pollOrFinal(): boolean {
+        return super.pollOrFinal
     }
-    private set payload(payload: any) {
-        super.payload = payload
+    public set pollOrFinal(pollOrFinal: boolean) {
+        super.pollOrFinal = pollOrFinal
     }
 
 }
