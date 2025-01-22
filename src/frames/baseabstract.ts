@@ -1,4 +1,5 @@
 import type { Repeater } from "../misc.js"
+import util from "node:util"
 
 export type FrameType = 'information' | 'supervisory' | 'unnumbered'
 export type SFrameType = 'RR' | 'RNR' | 'REJ' | 'SREJ'
@@ -6,8 +7,8 @@ export type UFrameType = 'SABME' | 'SABM' | 'DISC' | 'DM' | 'UA' | 'UI' | 'FRMR'
 export type IFrameType = 'I'
 
 export abstract class BaseAbstract {
-    protected abstract frameType: FrameType
-    public abstract frameSubtype: UFrameType | SFrameType | IFrameType
+    protected abstract type: FrameType
+    public abstract subtype: UFrameType | SFrameType | IFrameType
     public abstract destinationCallsign: string
     public abstract destinationSsid: number
     protected abstract destinationCommandBit: boolean // not serialized to JSON
@@ -33,8 +34,8 @@ export abstract class BaseAbstract {
 
     public toJSON() {
         return {
-            frameType: this.frameType,
-            frameSubtype: this.frameSubtype,
+            type: this.type,
+            subtype: this.subtype,
             destinationCallsign: this.destinationCallsign,
             destinationSsid: this.destinationSsid,
             destinationReservedBitOne: this.destinationReservedBitOne,
@@ -56,4 +57,9 @@ export abstract class BaseAbstract {
             payload: this.payload
         }
     }
+
+    [util.inspect.custom] = () => {
+        return this.toJSON()
+    }
+
 }
