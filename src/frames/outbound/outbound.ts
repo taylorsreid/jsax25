@@ -436,10 +436,6 @@ export abstract class OutboundFrame extends BaseAbstract {
         this._encoded = undefined
     }
 
-    public get t1(): number {
-        return ((this.encoded.length * 8) / (this.kissConnection?.txBaud ?? 1200)) * 1000 * (this.repeaters.length + 1)
-    }
-
     public get encoded(): number[] {
         // avoid reencoding if it's not necessary
         if (typeof this._encoded !== 'undefined') {
