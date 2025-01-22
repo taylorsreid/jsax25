@@ -15,7 +15,7 @@ export interface OutboundConstructor {
     /** The amateur radio callsign of the remote station. */
     destinationCallsign: string
     /** The SSID of the remote station, default is 0. */
-    destinationSsid?: number
+    destinationSsid: number
     /** The first reserved bit on the destination field. */
     destinationReservedBitOne?: boolean
     /** The second reserved bit on the destination field. */
@@ -23,7 +23,7 @@ export interface OutboundConstructor {
     /** The amateur radio callsign of your station. */
     sourceCallsign: string
     /** The SSID of your station, default is 0. */
-    sourceSsid?: number
+    sourceSsid: number
     /** The first reserved bit of the source field. */
     sourceReservedBitOne?: boolean
     /** The second reserved bit of the source field. */
@@ -83,11 +83,11 @@ export abstract class OutboundFrame extends BaseAbstract {
         this.binaryTwo = found.binaryTwo
         this.kissConnection = args.kissConnection
         this.destinationCallsign = args.destinationCallsign
-        this.destinationSsid = args.destinationSsid ?? 0
+        this.destinationSsid = args.destinationSsid
         this.destinationReservedBitOne = args?.destinationReservedBitOne ?? false
         this.destinationReservedBitTwo = args?.destinationReservedBitTwo ?? false
         this.sourceCallsign = args.sourceCallsign
-        this.sourceSsid = args.sourceSsid ?? 0
+        this.sourceSsid = args.sourceSsid
         this.sourceReservedBitOne = args.sourceReservedBitOne ?? false
         this.sourceReservedBitTwo = args.sourceReservedBitTwo ?? false
         this.repeaters = args?.repeaters ?? []
@@ -434,6 +434,10 @@ export abstract class OutboundFrame extends BaseAbstract {
     protected set payload(payload: string) { // not mutable on XID frames
         this._payload = payload
         this._encoded = undefined
+    }
+
+    public get t1(): number {
+        return ((this.encoded.length * 8) / (this.kissConnection?.txBaud ?? 1200)) * 1000 * (this.repeaters.length + 1)
     }
 
     public get encoded(): number[] {
