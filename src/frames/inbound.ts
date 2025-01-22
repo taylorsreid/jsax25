@@ -1,11 +1,10 @@
-import { DISCFrame, DMFrame, IFrame, KissConnection, REJFrame, RNRFrame, RRFrame, SABMEFrame, SABMFrame, SREJFrame, TESTFrame, UAFrame, UIFrame, XIDFrame, type IFrameConstructor, type OutgoingConstructor, type SFrameConstructor, type SREJFrameConstructor, type TestFrameConstructor, type UIFrameConstructor, type XIDFrameConstructor } from 'index.js';
-import JSONB from 'json-buffer';
+import { DISCFrame, DMFrame, IFrame, KissConnection, REJFrame, RNRFrame, RRFrame, SABMEFrame, SABMFrame, SREJFrame, TESTFrame, UAFrame, UIFrame, XIDFrame, type IFrameConstructor, type OutboundConstructor, type SFrameConstructor, type SREJFrameConstructor, type TestFrameConstructor, type UIFrameConstructor, type XIDFrameConstructor } from 'index.js';
 import type { SerialKissConstructor, TcpKissConstructor } from 'kissconnection.js';
 import type { Repeater } from "../misc.js";
 import { BaseAbstract, type FrameType, type IFrameType, type SFrameType, type UFrameType } from "./baseabstract.js";
 import { controlFieldCombinations, type ControlFieldCombination } from './controlFieldCombinations.js';
 
-export class IncomingFrame extends BaseAbstract {
+export class InboundFrame extends BaseAbstract {
     protected _destinationCallsign: string | undefined;
     protected _destinationSsid: number | undefined;
     protected _destinationCommandBit: boolean | undefined;
@@ -21,10 +20,10 @@ export class IncomingFrame extends BaseAbstract {
     protected _receivedSequence: number | undefined;
     protected _pollOrFinal: boolean | undefined;
     protected _sendSequence: number | undefined;
-    protected _frameType: FrameType | undefined;
-    protected _frameSubtype: IFrameType | UFrameType | SFrameType | undefined;
+    protected _type: FrameType | undefined;
+    protected _subtype: IFrameType | UFrameType | SFrameType | undefined;
     protected _pid: number | undefined;
-    protected _payload: any | undefined;
+    protected _payload: string | undefined;
     public readonly encoded: number[];
     public readonly kissConnection: KissConnection | undefined;
 
@@ -34,7 +33,7 @@ export class IncomingFrame extends BaseAbstract {
         //
         this.encoded = Array.from(encodedKissFrame)
 
-        // doing this after modulo assignment causes a weird race condition in bun
+        // doing this after modulo assignment causes a weird race condition in Bun
         if (this.encoded[0] === 0xC0) {
             this.encoded.shift()
         }
@@ -48,19 +47,9 @@ export class IncomingFrame extends BaseAbstract {
         else if (typeof kissConnection !== 'undefined') {
             this.kissConnection = new KissConnection(kissConnection)
         }
-
     }
 
-    protected static getBinaryString(byte: number): string {
-        // get the byte in binary form
-        let binary: string = byte.toString(2)
-        while (binary.length < 8) { // pad the SSID byte with zeros to a length of 8
-            binary = '0' + binary
-        }
-        return binary
-    }
-
-    public static decodeCallsign(bytes: number[]): string {
+    private static decodeCallsign(bytes: number[]): string {
         // counter and empty string for later
         let i = 0
         let callsign: string = ''
@@ -77,30 +66,28 @@ export class IncomingFrame extends BaseAbstract {
     /** Get the destination amateur radio callsign. */
     public get destinationCallsign(): string {
         if (typeof this._destinationCallsign === 'undefined') {
-            this._destinationCallsign = IncomingFrame.decodeCallsign(this.encoded.slice(1, 7))
+            this._destinationCallsign = InboundFrame.decodeCallsign(this.encoded.slice(1, 7))
         }
         return this._destinationCallsign
     }
 
     protected get destinationCommandBit(): boolean {
         if (typeof this._destinationCommandBit === 'undefined') {
-            this._destinationCommandBit = IncomingFrame.getBinaryString(this.encoded[7])[0] === '1'
+            this._destinationCommandBit = this.encoded[7].toString(2).padStart(8, '0').startsWith('1')
         }
         return this._destinationCommandBit
     }
 
-    // reserved by this library for future use
     public get destinationReservedBitOne(): boolean {
         if (typeof this._destinationReservedBitOne === 'undefined') {
-            this._destinationReservedBitOne = IncomingFrame.getBinaryString(this.encoded[7])[1] === '0'
+            this._destinationReservedBitOne = this.encoded[7].toString(2).padStart(8, '0')[1] === '0'
         }
         return this._destinationReservedBitOne
     }
 
-    // reserved by this library for future use
     public get destinationReservedBitTwo(): boolean {
         if (typeof this._destinationReservedBitTwo === 'undefined') {
-            this._destinationReservedBitTwo = IncomingFrame.getBinaryString(this.encoded[7])[2] === '0'
+            this._destinationReservedBitTwo = this.encoded[7].toString(2).padStart(8, '0')[2] === '0'
         }
         return this._destinationReservedBitTwo
     }
@@ -108,7 +95,7 @@ export class IncomingFrame extends BaseAbstract {
     /** Get the destination's SSID. */
     public get destinationSsid(): number {
         if (typeof this._destinationSsid === 'undefined') {
-            this._destinationSsid = parseInt(IncomingFrame.getBinaryString(this.encoded[7]).slice(3, 7), 2)
+            this._destinationSsid = parseInt(this.encoded[7].toString(2).padStart(8, '0').slice(3, 7), 2)
         }
         return this._destinationSsid
     }
@@ -116,55 +103,35 @@ export class IncomingFrame extends BaseAbstract {
     /** Get the sender's amateur radio callsign. */
     public get sourceCallsign(): string {
         if (typeof this._sourceCallsign === 'undefined') {
-            this._sourceCallsign = IncomingFrame.decodeCallsign(this.encoded.slice(8, 14))
+            this._sourceCallsign = InboundFrame.decodeCallsign(this.encoded.slice(8, 14))
         }
         return this._sourceCallsign
     }
 
     protected get sourceCommandBit(): boolean {
         if (typeof this._sourceCommandBit === 'undefined') {
-            this._sourceCommandBit = IncomingFrame.getBinaryString(this.encoded[14])[0] === '1'
+            this._sourceCommandBit = this.encoded[14].toString(2).padStart(8, '0').startsWith('1')
         }
         return this._sourceCommandBit
     }
 
     public get sourceReservedBitOne(): boolean {
         if (typeof this._sourceReservedBitOne === 'undefined') {
-            this._sourceReservedBitOne = IncomingFrame.getBinaryString(this.encoded[14])[1] === '0'
+            this._sourceReservedBitOne = this.encoded[14].toString(2).padStart(8, '0')[1] === '0'
         }
         return this._sourceReservedBitOne
     }
     public get sourceReservedBitTwo(): boolean {
         if (typeof this._sourceReservedBitTwo === 'undefined') {
-            this._sourceReservedBitTwo = IncomingFrame.getBinaryString(this.encoded[14])[2] === '0'
+            this._sourceReservedBitTwo = this.encoded[14].toString(2).padStart(8, '0')[2] === '0'
         }
         return this._sourceReservedBitTwo
     }
 
-    // TODO: compression moved to back burner
-    // public isCompressionEnabled(): boolean {
-    //     if (typeof this.compressionEnabled === 'undefined') {
-    //         this.compressionEnabled = IncomingFrame.getBinaryString(this.encoded[14])[1] === '0'
-    //         this.cacheManager.set(this.getSourceCallsign(), this.getSourceSsid(), { supportsCompression: this.compressionEnabled })
-    //     }
-    //     return this.compressionEnabled
-    // }
-
-    // /**
-    //  * Source address field reserved bit two is used by this library to indicate whether the outgoing frame is compressed or not.
-    //  * @returns A boolean representation of whether the bit is toggled on.
-    //  */
-    // public isPayloadCompressed(): boolean {
-    //     if (typeof this.payloadCompressed === 'undefined') {
-    //         this.payloadCompressed = IncomingFrame.getBinaryString(this.encoded[14])[2] === '0' && this.isCompressionEnabled() // double check both bits to prevent false positives
-    //     }
-    //     return this.payloadCompressed
-    // }
-
     /** Get the sender's SSID. */
     public get sourceSsid(): number {
         if (typeof this._sourceSsid === 'undefined') {
-            this._sourceSsid = parseInt(IncomingFrame.getBinaryString(this.encoded[14]).slice(3, 7), 2)
+            this._sourceSsid = parseInt(this.encoded[14].toString(2).padStart(8, '0').slice(3, 7), 2)
         }
         return this._sourceSsid
     }
@@ -203,9 +170,9 @@ export class IncomingFrame extends BaseAbstract {
             let position: number = 15
             while (this.encoded[position - 1].toString(2).endsWith('0')) {
                 this._repeaters.push({
-                    callsign: IncomingFrame.decodeCallsign(this.encoded.slice(position, position + 6)),
-                    ssid: parseInt(IncomingFrame.getBinaryString(this.encoded[position + 6]).slice(3, 7), 2),
-                    hasBeenRepeated: IncomingFrame.getBinaryString(this.encoded[position + 6]).startsWith('1')
+                    callsign: InboundFrame.decodeCallsign(this.encoded.slice(position, position + 6)),
+                    ssid: parseInt(this.encoded[position + 6].toString(2).padStart(8, '0').slice(3, 7), 2),
+                    hasBeenRepeated: this.encoded[position + 6].toString(2).padStart(8, '0').startsWith('1')
                 })
                 position += 7
             }
@@ -214,36 +181,37 @@ export class IncomingFrame extends BaseAbstract {
     }
 
     private getControlFieldBits(): string {
-        return (this.modulo === 8) ? IncomingFrame.getBinaryString(this.encoded[15 + (7 * this.repeaters.length)]) : IncomingFrame.getBinaryString(this.encoded[15 + (7 * this.repeaters.length)]) + IncomingFrame.getBinaryString(this.encoded[16 + (7 * this.repeaters.length)])
+        // TODO: EXPLAIN
+        return (this.modulo === 8) ? this.encoded[15 + (7 * this.repeaters.length)].toString(2).padStart(8, '0') : this.encoded[15 + (7 * this.repeaters.length)].toString(2).padStart(8, '0') + this.encoded[16 + (7 * this.repeaters.length)].toString(2).padStart(8, '0')
     }
 
-    public get frameType(): FrameType {
-        if (typeof this._frameType === 'undefined') {
+    public get type(): FrameType {
+        if (typeof this._type === 'undefined') {
             const cfb: string = this.getControlFieldBits()
             if (cfb.endsWith('11')) {
-                this._frameType = 'unnumbered'
+                this._type = 'unnumbered'
             }
             else if (cfb.endsWith('01')) {
-                this._frameType = 'supervisory'
+                this._type = 'supervisory'
             }
             else {
-                this._frameType = 'information'
+                this._type = 'information'
             }
         }
-        return this._frameType
+        return this._type
     }
 
-    public get frameSubtype(): UFrameType | SFrameType | IFrameType {
-        if (typeof this._frameSubtype === 'undefined') {
+    public get subtype(): UFrameType | SFrameType | IFrameType {
+        if (typeof this._subtype === 'undefined') {
 
             const cfb: string = this.getControlFieldBits()
-            if (this.frameType === 'unnumbered') {
+            if (this.type === 'unnumbered') {
                 const found: ControlFieldCombination = controlFieldCombinations.find((cc) => {
                     return cc.binaryOne === cfb.slice(0, 3) && cc.binaryTwo === cfb.slice(4)
                 })! // all valid frame types are listed
-                this._frameSubtype = found.frameSubtype
+                this._subtype = found.frameSubtype
             }
-            else if (this.frameType === 'supervisory') {
+            else if (this.type === 'supervisory') {
                 const found: ControlFieldCombination = controlFieldCombinations.find((cc) => {
                     if (this.modulo === 8) {
                         return cc.binaryTwo === cfb.slice(4, 8)
@@ -252,23 +220,20 @@ export class IncomingFrame extends BaseAbstract {
                         return cc.binaryTwo === cfb.slice(8, 16)
                     }
                 })! // all valid frame types are listed
-                this._frameSubtype = found.frameSubtype
+                this._subtype = found.frameSubtype
             }
             else {
-                this._frameSubtype = 'I'
+                this._subtype = 'I'
             }
         }
-        return this._frameSubtype! // it has to be one of the 3
+        return this._subtype! // it has to be one of the 3
     }
 
     public get receivedSequence(): number | undefined {
-        if (this.frameType !== 'unnumbered') { // received sequences only exist on the other 2 internal frame types
-            if (typeof this._receivedSequence === 'undefined') {
-                this._receivedSequence = (this.modulo === 8) ? parseInt(this.getControlFieldBits().slice(0, 3), 2) : parseInt(this.getControlFieldBits().slice(0, 7), 2)
-            }
-            return this._receivedSequence
+        if (this.type !== 'unnumbered' && typeof this._receivedSequence === 'undefined') { // received sequences only exist on the other 2 internal frame types
+            this._receivedSequence = (this.modulo === 8) ? parseInt(this.getControlFieldBits().slice(0, 3), 2) : parseInt(this.getControlFieldBits().slice(0, 7), 2)
         }
-        return undefined
+        return this._receivedSequence
     }
 
     public get pollOrFinal(): boolean {
@@ -279,13 +244,10 @@ export class IncomingFrame extends BaseAbstract {
     }
 
     public get sendSequence(): number | undefined {
-        if (this.frameSubtype === 'I') { // send sequences only exist on I frames
-            if (typeof this._sendSequence === 'undefined') {
-                this._sendSequence = (this.modulo === 8) ? parseInt(this.getControlFieldBits().slice(4, 7), 2) : parseInt(this.getControlFieldBits().slice(8, 16), 2)
-            }
-            return this._sendSequence
+        if (this.subtype === 'I' && typeof this._sendSequence === 'undefined') { // send sequences only exist on I frames
+            this._sendSequence = (this.modulo === 8) ? parseInt(this.getControlFieldBits().slice(4, 7), 2) : parseInt(this.getControlFieldBits().slice(8, 16), 2)
         }
-        return undefined
+        return this._sendSequence
     }
 
     /**
@@ -293,57 +255,27 @@ export class IncomingFrame extends BaseAbstract {
      * @returns a number corresponding to the layer 3 protocol in use. See AX.25 documentation for a key: value table.
      */
     public get pid(): number | undefined {
-        if (typeof this._pid === 'undefined' && (this.frameSubtype === 'I' || this.frameSubtype === 'UI')) { // only exist on I and UI frames
+        if (typeof this._pid === 'undefined' && (this.subtype === 'I' || this.subtype === 'UI')) { // only exist on I and UI frames
             this._pid = this.encoded[16 + (7 * this.repeaters.length)]
         }
         return this._pid
     }
 
-    public get payload(): any | undefined {
-        if (typeof this._payload === 'undefined' && (this.frameSubtype === 'UI' || this.frameSubtype === 'I' || this.frameSubtype === 'TEST' || this.frameSubtype === 'XID')) {
-
+    public get payload(): string | undefined {
+        if (typeof this._payload === 'undefined' && (this.subtype === 'UI' || this.subtype === 'I' || this.subtype === 'TEST' || this.subtype === 'XID')) {
             this._payload = ''
 
-            // 
-            let position: number = ((this.frameSubtype === 'I' || this.frameSubtype === 'UI') ? 17 : 16) + (7 * this.repeaters.length) // if no repeaters then position is 16, if 1 repeater then position is 23, if 2 repeaters then position is 30
+            // ternary accounts for the presence of a pid field
+            let position: number = ((this.subtype === 'I' || this.subtype === 'UI') ? 17 : 16) + (7 * this.repeaters.length)
 
-            // 
+            // decode all the way until the frame end flag since kiss frames have a 0xC0 at the end of the frame
             this._payload = String.fromCharCode(...this.encoded.slice(position, this.encoded.lastIndexOf(0xC0)))
-
-            // TODO: compression moved to back burner
-            // if (this.isPayloadCompressed()) { // getPayloadIsCompressed() actually double checks both bits to prevent false positives
-            //     try {
-            //         this.payload = brotliDecompressSync(JSONB.parse(this.payload)).toString()
-            //         this.cacheManager.set(this.getDestinationCallsign(), this.getDestinationSsid(), { supportsCompression: true })
-            //     }
-            //     catch (error) { // if decompression fails then something else must be using the reserved bits, save that to the cache to prevent sending compressed data to a client that doesn't support it
-            //         this.cacheManager.set(this.getDestinationCallsign(), this.getDestinationSsid(), { supportsCompression: false })
-            //     }
-            // }
-
-            // if the decoded payload starts with JSONish characters, try parsing it. Do not parse information frames because multiple frame payloads need to be concatenated first
-            if (((this._payload as string).startsWith('{') || (this._payload as string).startsWith('[')) && this.frameSubtype !== 'I') {
-                try {
-                    this._payload = JSONB.parse(this._payload as string)
-                } catch (error) {
-                    // it was probably just a string that started with { or [, so we'll continue
-                }
-            }
-            // if it's a number as a string, parse it to a number, again ignore it if it's an information frame because we need to concatenate the payloads first
-            else if (!isNaN(this._payload as number) && this.frameSubtype !== 'I') {
-                if ((this._payload as string).includes('.')) {
-                    this._payload = parseFloat(this._payload as string)
-                }
-                else {
-                    this._payload = parseInt(this._payload as string)
-                }
-            }
         }
         return this._payload
     }
 
     // use a getter so that it's lazy loaded
-    protected get responseConstructor(): OutgoingConstructor {
+    protected get responseConstructor(): OutboundConstructor {
         return {
             kissConnection: this.kissConnection,
             destinationCallsign: this.sourceCallsign,
@@ -370,19 +302,19 @@ export class IncomingFrame extends BaseAbstract {
         return c
     }
 
-    public REJFrame(receivedSequence: number, requestRemoteStatus: boolean): REJFrame {
+    public newREJFrame(receivedSequence: number, requestRemoteStatus: boolean): REJFrame {
         return new REJFrame(this.sResponseConstructor(receivedSequence, requestRemoteStatus))
     }
 
-    public RNRFrame(receivedSequence: number, requestRemoteStatus: boolean): RNRFrame {
+    public newRNRFrame(receivedSequence: number, requestRemoteStatus: boolean): RNRFrame {
         return new RNRFrame(this.sResponseConstructor(receivedSequence, requestRemoteStatus))
     }
 
-    public RRFrame(receivedSequence: number, requestRemoteStatus: boolean): RRFrame {
+    public newRRFrame(receivedSequence: number, requestRemoteStatus: boolean): RRFrame {
         return new RRFrame(this.sResponseConstructor(receivedSequence, requestRemoteStatus))
     }
 
-    public SREJFrame(receivedSequence: number, pollOrFinal: boolean, commandOrResponse: 'command' | 'response'): SREJFrame {
+    public newSREJFrame(receivedSequence: number, pollOrFinal: boolean, commandOrResponse: 'command' | 'response'): SREJFrame {
         const c: SREJFrameConstructor = structuredClone(this.responseConstructor) as SREJFrameConstructor
         c.modulo = this.modulo
         c.receivedSequence = receivedSequence
@@ -391,34 +323,34 @@ export class IncomingFrame extends BaseAbstract {
         return new SREJFrame(c)
     }
 
-    public DISCFrame(): DISCFrame {
+    public newDISCFrame(): DISCFrame {
         return new DISCFrame(this.responseConstructor)
     }
 
-    public DMFrame(): DMFrame {
+    public newDMFrame(): DMFrame {
         return new DMFrame(this.responseConstructor)
     }
 
-    public SABMFrame(): SABMFrame {
+    public newSABMFrame(): SABMFrame {
         return new SABMFrame(this.responseConstructor)
     }
 
-    public SABMEFrame(): SABMEFrame {
+    public newSABMEFrame(): SABMEFrame {
         return new SABMEFrame(this.responseConstructor)
     }
 
-    public TESTFrame(payload?: any, commandOrResponse: 'command' | 'response' = 'command'): TESTFrame {
+    public newTESTFrame(payload?: any, commandOrResponse: 'command' | 'response' = 'command'): TESTFrame {
         const c: TestFrameConstructor = structuredClone(this.responseConstructor)
         c.payload = payload
         c.commandOrResponse = commandOrResponse
         return new TESTFrame(c)
     }
 
-    public UAFrame(): UAFrame {
+    public newUAFrame(): UAFrame {
         return new UAFrame(this.responseConstructor)
     }
 
-    public UIFrame(payload: any, pid: number = this.pid ?? 240, pollOrFinal: boolean = false, commandOrResponse: 'command' | 'response' = 'response'): UIFrame {
+    public newUIFrame(payload: any, pid: number = this.pid ?? 240, pollOrFinal: boolean = false, commandOrResponse: 'command' | 'response' = 'response'): UIFrame {
         const c: UIFrameConstructor = structuredClone(this.responseConstructor) as UIFrameConstructor
         c.payload = payload
         c.pid = pid
@@ -427,14 +359,14 @@ export class IncomingFrame extends BaseAbstract {
         return new UIFrame(c)
     }
 
-    public XIDFrame(commandOrResponse: 'command' | 'response' = 'response', pollOrFinal: boolean = false): XIDFrame {
+    public newXIDFrame(commandOrResponse: 'command' | 'response' = 'response', pollOrFinal: boolean = false): XIDFrame {
         const c: XIDFrameConstructor = structuredClone(this.responseConstructor)
         c.commandOrResponse = commandOrResponse
         c.pollOrFinal = pollOrFinal
         return new XIDFrame(c)
     }
 
-    public IFrame(payload: any, receivedSequence: number, sendSequence: number, pollOrFinal: boolean = false, pid: number = this.pid ?? 240): IFrame {
+    public newIFrame(payload: any, receivedSequence: number, sendSequence: number, pollOrFinal: boolean = false, pid: number = this.pid ?? 240): IFrame {
         const c: IFrameConstructor = structuredClone(this.responseConstructor) as IFrameConstructor
         c.modulo = this.modulo
         c.payload = payload
