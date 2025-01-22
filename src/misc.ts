@@ -68,3 +68,9 @@ export function resetRepeaters(repeaters: Repeater[] | undefined): Repeater[] {
     }
     return []
 }
+
+export function validateT1(ms: number) {
+    if (ms < 0) {
+        throw new Error(`${ms} is not a valid t1 value. T1 must be an integer greater than or equal to 0 expressed in milliseconds.`)
+    }
+}
