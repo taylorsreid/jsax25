@@ -1,7 +1,7 @@
-import type { mutableModulo, hasPayload, hasPid, hasReceivedSequence, hasSendSequence, mutablePollOrFinal, } from "../../misc.js";
-import { OutgoingAbstract, type OutgoingConstructor } from "./outgoingabstract.js";
+import type { hasPayload, hasPid, hasReceivedSequence, hasSendSequence, mutableModulo, mutablePollOrFinal, } from "../../misc.js";
+import { OutboundFrame, type OutboundConstructor } from "./outbound.js";
 
-export interface IFrameConstructor extends OutgoingConstructor {
+export interface IFrameConstructor extends OutboundConstructor {
     modulo?: 8 | 128
     receivedSequence: number
     pollOrFinal?: boolean
@@ -10,7 +10,7 @@ export interface IFrameConstructor extends OutgoingConstructor {
     payload: any
 }
 
-export class IFrame extends OutgoingAbstract implements mutablePollOrFinal, hasPid, hasPayload, hasReceivedSequence, hasSendSequence, mutableModulo {
+export class IFrame extends OutboundFrame implements mutablePollOrFinal, hasPid, hasPayload, hasReceivedSequence, hasSendSequence, mutableModulo {
 
     constructor(args: IFrameConstructor) {
         super(args, 'I')

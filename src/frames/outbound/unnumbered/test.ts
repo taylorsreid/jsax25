@@ -1,13 +1,12 @@
 import type { hasPayload, mutableCommandOrResponse } from "../../../misc.js";
-import { OutgoingAbstract, type OutgoingConstructor } from "../outgoingabstract.js";
+import { OutboundFrame, type OutboundConstructor } from "../outbound.js";
 
-export interface TestFrameConstructor extends OutgoingConstructor {
-    /**  */
+export interface TestFrameConstructor extends OutboundConstructor {
     commandOrResponse?: 'command' | 'response'
     payload?: any
 }
 
-export class TESTFrame extends OutgoingAbstract implements hasPayload, mutableCommandOrResponse {
+export class TESTFrame extends OutboundFrame implements hasPayload, mutableCommandOrResponse {
 
     constructor(args: TestFrameConstructor) {
         super(args, 'TEST')

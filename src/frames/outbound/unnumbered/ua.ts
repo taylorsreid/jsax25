@@ -1,7 +1,7 @@
-import { OutgoingAbstract, type OutgoingConstructor } from "../outgoingabstract.js";
+import { OutboundFrame, type OutboundConstructor } from "../outbound.js";
 
-export class UAFrame extends OutgoingAbstract {
-    constructor(args: OutgoingConstructor) {
+export class UAFrame extends OutboundFrame {
+    constructor(args: OutboundConstructor) {
         super(args, 'UA')
     }
 }

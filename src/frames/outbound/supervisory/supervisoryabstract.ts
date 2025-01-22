@@ -1,15 +1,15 @@
 import type { hasReceivedSequence, mutableCommandOrResponse, mutableModulo, mutablePollOrFinal } from "../../../misc.js";
 import type { IFrameType, SFrameType, UFrameType } from "../../baseabstract.js";
-import { OutgoingAbstract, type OutgoingConstructor } from "../outgoingabstract.js";
+import { OutboundFrame, type OutboundConstructor } from "../outbound.js";
 
-export interface SFrameConstructor extends OutgoingConstructor {
+export interface SFrameConstructor extends OutboundConstructor {
     modulo?: 8 | 128
     receivedSequence: number
     pollOrFinal?: boolean
     commandOrResponse?: 'command' | 'response'
 }
 
-export abstract class SupervisoryAbstract extends OutgoingAbstract implements mutablePollOrFinal, hasReceivedSequence, mutableModulo, mutableCommandOrResponse {
+export abstract class SupervisoryAbstract extends OutboundFrame implements mutablePollOrFinal, hasReceivedSequence, mutableModulo, mutableCommandOrResponse {
 
     constructor(args: SFrameConstructor, frameSubtype: IFrameType | UFrameType | SFrameType) {
         super(args, frameSubtype)
