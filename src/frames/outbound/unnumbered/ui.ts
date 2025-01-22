@@ -1,14 +1,14 @@
 import type { hasPayload, hasPid, mutableCommandOrResponse, mutablePollOrFinal } from "../../../misc.js";
-import { OutgoingAbstract, type OutgoingConstructor } from "../outgoingabstract.js";
+import { OutboundFrame, type OutboundConstructor } from "../outbound.js";
 
-export interface UIFrameConstructor extends OutgoingConstructor {
+export interface UIFrameConstructor extends OutboundConstructor {
     commandOrResponse?: 'command' | 'response'
     pollOrFinal?: boolean
     pid?: number
-    payload: any
+    payload: string
 }
 
-export class UIFrame extends OutgoingAbstract implements mutableCommandOrResponse, mutablePollOrFinal, hasPid, hasPayload {
+export class UIFrame extends OutboundFrame implements mutableCommandOrResponse, mutablePollOrFinal, hasPid, hasPayload {
     // use this.x in the constructor
     constructor(args: UIFrameConstructor) {
         super(args, 'UI')
@@ -38,10 +38,10 @@ export class UIFrame extends OutgoingAbstract implements mutableCommandOrRespons
         super.pid = pid
     }
 
-    public get payload(): any {
-        return super.payload
+    public get payload(): string {
+        return super.payload!
     }
-    public set payload(payload: any) {
+    public set payload(payload: string) {
         super.payload = payload
     }
     
