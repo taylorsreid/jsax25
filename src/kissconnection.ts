@@ -118,7 +118,7 @@ export class KissConnection extends EventEmitter {
     /**
      * Close the current serial or TCP connection.
      */
-    public end(): void {
+    public close(): void {
         this.connection.end()
     }
 
