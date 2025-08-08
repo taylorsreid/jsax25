@@ -1,8 +1,11 @@
 import EventEmitter from 'events';
+import { Duplex, PassThrough } from 'stream';
 import { Socket, createConnection } from 'net';
 import { SerialPort } from 'serialport';
+import { KISSReceiver } from 'kiss-tnc';
 import { InboundFrame } from './index.js';
 import { OutboundFrame } from 'frames/outbound/outbound.js';
+import { DEFAULT_SERIAL_BAUD, validateBaudRate } from 'misc.js';
 
 interface BaseKissConstructor {
     txBaud?: number
@@ -22,28 +25,37 @@ export interface SerialKissConstructor extends BaseKissConstructor {
 
 /**
  * A SerialPort/Socket connection to a TNC or software modem that encodes, compresses (optional), sends, receives, decodes, decompresses (if necessary), and emits AX.25 packets for amateur radio use.
- * 
  * See exported interface KissConnectionConstructor for constructor options.
- * 
- * send(frameOrFrames:KissFrameOptionalSource|KissFrameOptionalSource[]) takes unencoded kiss frame(s) (see interface KissInput for format), runs them through the above mentioned processes, and sends them immediately.
- * 
+ *
+ * Takes unencoded kiss frame(s) (see interface KissInput for format), runs them through the above mentioned processes, and sends them immediately.
+ *
  * Call the listen(callback: (data: DecodedKissFrame) => { // do stuff }, filter?: ListenFilter) method to begin listening for packets. See method documentation for filtering specs.
+ *
+ * @example
+ * send(frameOrFrames:KissFrameOptionalSource|KissFrameOptionalSource[])
  */
 export class KissConnection extends EventEmitter {
-    private _connection: SerialPort | Socket;
-    private _txBaud: number;
+    private _sendCx: Socket | SerialPort
+    private _listenCx: KISSReceiver
+    private _txBaud: number
+    private _connection: PassThrough
 
     constructor(args: TcpKissConstructor | SerialKissConstructor) {
 
         super()
 
-        this.txBaud = args.txBaud ?? 1200
+        this.txBaud = validateBaudRate(args.txBaud)
 
-        this.connection = args
+        this.setConnection(args)
+
+        this._connection.on('data', data => this._sendCx.write(data))
 
         // attach event listener upon object instantiation
-        this.connection.on('data', (data: number[]) => {
-            this.emit('data', new InboundFrame(data, this));
+        this._listenCx.on('data', (data: Buffer) => {
+            const frame = new InboundFrame(Array.from(data), this)
+
+            this.emit('data', frame);
+            this._connection.emit('data', frame)
         });
     }
 
@@ -55,15 +67,18 @@ export class KissConnection extends EventEmitter {
         return super.on(eventName, listener)
     }
 
-    public get connection(): SerialPort | Socket {
+    public get connection(): Duplex {
         return this._connection;
     }
-    public set connection(conn: Socket | SerialPort | TcpKissConstructor | SerialKissConstructor) {
+
+    public setConnection(conn: Socket | SerialPort | TcpKissConstructor | SerialKissConstructor) {
+        let baseConnection: Socket | SerialPort;
+
         if (conn instanceof Socket || conn instanceof SerialPort) {
-            this._connection = conn
+            baseConnection = conn
         }
         else if ('host' in conn && 'port' in conn) {
-            this._connection = createConnection({
+            baseConnection = createConnection({
                 host: conn.host,
                 port: conn.port
             })
@@ -73,15 +88,18 @@ export class KissConnection extends EventEmitter {
             if (process.versions.bun) {
                 throw new Error('Serial connections with Bun are not supported yet due to a bug in Bun.\nRun in Node or rerun with Bun using a TCP connection.\nSee https://github.com/oven-sh/bun/issues/10704 and https://github.com/oven-sh/bun/issues/4622 for details.')
             }
-            this._connection = new SerialPort({
+            baseConnection = new SerialPort({
                 path: conn.path,
-                baudRate: ('serialBaud' in conn && typeof conn.serialBaud === 'number') ? conn.serialBaud : 19200,
+                baudRate: ('serialBaud' in conn && typeof conn.serialBaud === 'number') ? conn.serialBaud : DEFAULT_SERIAL_BAUD,
                 lock: false
             })
         }
         else {
             throw new Error('You must specify the connection details for a TCP or serial connection.')
         }
+
+        this._listenCx = baseConnection.pipe(new KISSReceiver({ emitObject: false, emitCommandByte: false }))
+        this._sendCx = baseConnection
     }
 
     public get txBaud(): number {
@@ -134,11 +152,13 @@ export class KissConnection extends EventEmitter {
         if (frame instanceof OutboundFrame) {
             frame = frame.encoded
         }
+
         if (frame.length < 17) {
             return Promise.reject(new Error(`Encoded packet is below the AX.25 minimum of 136 bits. The current length is ${frame.length * 8} bits.`))
         }
+
         return new Promise((resolve, reject) => {
-            this.connection.write(new Uint8Array(frame), (err: Error) => {
+            this._sendCx.write(new Uint8Array(frame), (err: Error) => {
                 if (err) {
                     reject(err)
                 }

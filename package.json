@@ -33,6 +33,7 @@
     "url": "https://github.com/taylorsreid/jsax25/issues"
   },
   "dependencies": {
+    "kiss-tnc": "^1.1.0",
     "serialport": "latest"
   },
   "homepage": "https://github.com/taylorsreid/jsax25#readme",
