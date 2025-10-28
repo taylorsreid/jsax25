@@ -5,18 +5,19 @@ export type FrameType = 'information' | 'supervisory' | 'unnumbered'
 export type SFrameType = 'RR' | 'RNR' | 'REJ' | 'SREJ'
 export type UFrameType = 'SABME' | 'SABM' | 'DISC' | 'DM' | 'UA' | 'UI' | 'FRMR' | 'XID' | 'TEST'
 export type IFrameType = 'I'
+export type FrameSubtype = SFrameType | UFrameType | IFrameType
 
 export abstract class BaseAbstract {
-    protected abstract type: FrameType
-    public abstract subtype: UFrameType | SFrameType | IFrameType
+    public abstract type: FrameType
+    public abstract subtype: FrameSubtype
     public abstract destinationCallsign: string
     public abstract destinationSsid: number
-    protected abstract destinationCommandBit: boolean // not serialized to JSON
+    public abstract destinationCommandBit: boolean
     public abstract destinationReservedBitOne: boolean
     public abstract destinationReservedBitTwo: boolean
     public abstract sourceCallsign: string
     public abstract sourceSsid: number
-    protected abstract sourceCommandBit: boolean // not serialized to JSON
+    public abstract sourceCommandBit: boolean
     public abstract sourceReservedBitOne: boolean
     public abstract sourceReservedBitTwo: boolean
     public abstract commandOrResponse: 'command' | 'response' | 'legacy'
@@ -29,7 +30,7 @@ export abstract class BaseAbstract {
     public abstract pollOrFinal: boolean
     protected abstract sendSequence: number | undefined
     protected abstract pid: number | undefined
-    protected abstract payload: any | undefined
+    protected abstract payload: any
     public abstract encoded: number[]
 
     public toJSON() {
@@ -38,10 +39,12 @@ export abstract class BaseAbstract {
             subtype: this.subtype,
             destinationCallsign: this.destinationCallsign,
             destinationSsid: this.destinationSsid,
+            destinationCommandBit: this.destinationCommandBit,
             destinationReservedBitOne: this.destinationReservedBitOne,
             destinationReservedBitTwo: this.destinationReservedBitTwo,
             sourceCallsign: this.sourceCallsign,
             sourceSsid: this.sourceSsid,
+            sourceCommandBit: this.sourceCommandBit,
             sourceReservedBitOne: this.sourceReservedBitOne,
             sourceReservedBitTwo: this.sourceReservedBitTwo,
             commandOrResponse: this.commandOrResponse,

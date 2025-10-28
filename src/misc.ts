@@ -40,8 +40,8 @@ export interface mutableModulo {
 }
 
 export function validateCallsign(callsign: string) {
-    if (callsign.length < 1 || callsign.length > 6) {
-        throw new Error(`'${callsign}' is not a valid callsign. Callsigns must have a length from 1 to 6 characters inclusive.`)
+    if (callsign.length < 1 || callsign.length > 6 || (callsign !== callsign.toUpperCase().trim())) {
+        throw new Error(`'${callsign}' is not a valid callsign. Callsigns must have a length from 1 to 6 characters inclusive, be in all capitals, and contain no whitespace.`)
     }
 }
 
@@ -52,25 +52,14 @@ export function validateSsid(ssid: number) {
 }
 
 export function validatePid(pid: number) {
-    if (pid < 0) {
-        throw new Error(`${pid} is not a valid PID. PIDs must be greater than or equal to 0.`)
+    if (pid < 0 || pid > 255) {
+        throw new Error(`${pid} is not a valid PID. PIDs must be greater than or equal to 0 and less than or equal to 255.`)
     }
 }
 
-export function resetRepeaters(repeaters: Repeater[] | undefined): Repeater[] {
-    if (repeaters) {
-        return repeaters.map((r) => {
-            validateCallsign(r.callsign)
-            validateSsid(r.ssid)
-            r.hasBeenRepeated = false
-            return r
-        })
-    }
-    return []
-}
-
-export function validateT1(ms: number) {
-    if (ms < 0) {
-        throw new Error(`${ms} is not a valid t1 value. T1 must be an integer greater than or equal to 0 expressed in milliseconds.`)
-    }
+export function resetRepeaters(repeaters: Repeater[]): Repeater[] {
+    return structuredClone(repeaters).map((r) => {
+        r.hasBeenRepeated = false
+        return r
+    })
 }

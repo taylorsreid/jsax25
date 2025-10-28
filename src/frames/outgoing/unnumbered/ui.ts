@@ -1,14 +1,14 @@
 import type { hasPayload, hasPid, mutableCommandOrResponse, mutablePollOrFinal } from "../../../misc.js";
-import { OutboundFrame, type OutboundConstructor } from "../outbound.js";
+import { OutgoingFrame, type OutgoingConstructor } from "../outgoing.js";
 
-export interface UIFrameConstructor extends OutboundConstructor {
+export interface UIFrameConstructor extends OutgoingConstructor {
     commandOrResponse?: 'command' | 'response'
     pollOrFinal?: boolean
     pid?: number
-    payload: string
+    payload: any
 }
 
-export class UIFrame extends OutboundFrame implements mutableCommandOrResponse, mutablePollOrFinal, hasPid, hasPayload {
+export class UIFrame extends OutgoingFrame implements mutableCommandOrResponse, mutablePollOrFinal, hasPid, hasPayload {
     // use this.x in the constructor
     constructor(args: UIFrameConstructor) {
         super(args, 'UI')
@@ -17,31 +17,31 @@ export class UIFrame extends OutboundFrame implements mutableCommandOrResponse, 
     // use super.x in the getters and setters
     // all setters must have a getter or the property will be returned as undefined
 
-    public get commandOrResponse(): 'command' | 'response' {
+    public override get commandOrResponse(): 'command' | 'response' {
         return super.commandOrResponse
     }
-    public set commandOrResponse(commandOrResponse: "command" | "response") {
+    public override set commandOrResponse(commandOrResponse: "command" | "response") {
         super.commandOrResponse = commandOrResponse
     }
 
-    public get pollOrFinal(): boolean {
+    public override get pollOrFinal(): boolean {
         return super.pollOrFinal
     }
-    public set pollOrFinal(pollOrFinal: boolean) {
+    public override set pollOrFinal(pollOrFinal: boolean) {
         super.pollOrFinal = pollOrFinal
     }
 
-    public get pid(): number {
+    public override get pid(): number {
         return super.pid!
     }
-    public set pid(pid: number) {
+    public override set pid(pid: number) {
         super.pid = pid
     }
 
-    public get payload(): string {
+    public override get payload(): any {
         return super.payload!
     }
-    public set payload(payload: string) {
+    public override set payload(payload: any) {
         super.payload = payload
     }
     

@@ -17,7 +17,9 @@
         "strictNullChecks": true,
         "noUnusedLocals": true,
         "types": [],
-        "verbatimModuleSyntax": true
+        "verbatimModuleSyntax": true,
+        "noImplicitOverride": true,
+        "strictPropertyInitialization": true,
     },
-    "include": ["src/**/*"]
+    "include": ["src/**/*", "package.json"]
 }

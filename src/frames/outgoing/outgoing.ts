@@ -1,6 +1,7 @@
+import { isPromise } from "util/types";
 import { KissConnection, type SerialKissConstructor, type TcpKissConstructor } from "../../index.js";
 import { validateCallsign, validateSsid, type Repeater } from "../../misc.js";
-import { BaseAbstract, type FrameType, type IFrameType, type SFrameType, type UFrameType } from "../baseabstract.js";
+import { BaseAbstract, type FrameSubtype, type FrameType } from "../baseabstract.js";
 import { controlFieldCombinations } from "../controlFieldCombinations.js";
 import type { IFrameConstructor } from './information.js';
 import type { SREJFrameConstructor } from './supervisory/srej.js';
@@ -9,7 +10,7 @@ import type { TestFrameConstructor } from './unnumbered/test.js';
 import type { UIFrameConstructor } from './unnumbered/ui.js';
 import type { XIDFrameConstructor } from './unnumbered/xid.js';
 
-export interface OutboundConstructor {
+export interface OutgoingConstructor {
     /** A configured and active KissConnection to send the outgoing frame on. */
     kissConnection?: KissConnection | TcpKissConstructor | SerialKissConstructor
     /** The amateur radio callsign of the remote station. */
@@ -32,42 +33,37 @@ export interface OutboundConstructor {
     repeaters?: Repeater[],
 }
 
-export abstract class OutboundFrame extends BaseAbstract {
-    public readonly subtype: IFrameType | UFrameType | SFrameType
+export abstract class OutgoingFrame extends BaseAbstract {
+    // all ! properties are set via setters and/or the controlFieldCombinations search
+    public readonly subtype: FrameSubtype
     public readonly type: FrameType
     private _kissConnection: KissConnection | undefined
-    private _destinationCallsign: string
-    private _destinationSsid: number
-    private _destinationCommandBit: boolean;
-    private _destinationReservedBitOne: boolean;
-    private _destinationReservedBitTwo: boolean;
-    private _sourceCallsign: string
-    private _sourceSsid: number
-    private _sourceCommandBit: boolean;
-    private _sourceReservedBitOne: boolean;
-    private _sourceReservedBitTwo: boolean;
-    private _repeaters: Repeater[];
+    private _destinationCallsign!: string
+    private _destinationSsid!: number
+    private _destinationCommandBit!: boolean;  // set by commandOrResponse setter and/or the controlFieldCombinations search
+    private _destinationReservedBitOne!: boolean;
+    private _destinationReservedBitTwo!: boolean;
+    private _sourceCallsign!: string
+    private _sourceSsid!: number
+    private _sourceCommandBit!: boolean;  // set by commandOrResponse setter and/or the controlFieldCombinations search
+    private _sourceReservedBitOne!: boolean;
+    private _sourceReservedBitTwo!: boolean;
+    private _repeaters!: Repeater[];
     private _modulo: 8 | 128;
     private binaryOne: string | undefined;
     private _receivedSequence: number | undefined
-    private _pollOrFinal: boolean;
+    private _pollOrFinal!: boolean;
     private binaryTwo: string | undefined;
     private _sendSequence: number | undefined
     private _pid: number | undefined;
-    private _payload: string | undefined
+    private _payload: any
     private _encoded: number[] | undefined
 
-    constructor(args: OutboundConstructor | IFrameConstructor | SFrameConstructor | SREJFrameConstructor | TestFrameConstructor | UIFrameConstructor | XIDFrameConstructor, frameSubtype: IFrameType | UFrameType | SFrameType) {
+    constructor(args: OutgoingConstructor | IFrameConstructor | SFrameConstructor | SREJFrameConstructor | TestFrameConstructor | UIFrameConstructor | XIDFrameConstructor, frameSubtype: FrameSubtype) {
 
         super()
 
-        // bypass setter
-        if ('modulo' in args) {
-            this._modulo = args.modulo ?? 8
-        }
-        else {
-            this._modulo = 8
-        }
+        this._modulo = ('modulo' in args && typeof args.modulo !== 'undefined') ? args.modulo : 8
 
         const found = controlFieldCombinations.find((cc) => {
             return cc.frameSubtype === frameSubtype && cc.modulo === this.modulo
@@ -91,24 +87,10 @@ export abstract class OutboundFrame extends BaseAbstract {
         this.sourceReservedBitOne = args.sourceReservedBitOne ?? false
         this.sourceReservedBitTwo = args.sourceReservedBitTwo ?? false
         this.repeaters = args?.repeaters ?? []
-        if ('commandOrResponse' in args) {
-            this.commandOrResponse = args.commandOrResponse ?? found.commandOrResponse
-        }
-        else {
-            this.commandOrResponse = found.commandOrResponse
-        }
-        if ('pollOrFinal' in args) {
-            this.pollOrFinal = args.pollOrFinal ?? found.pollOrFinal
-        }
-        else {
-            this.pollOrFinal = found.pollOrFinal
-        }
-        if ('receivedSequence' in args && (this.type === 'information' || this.type === 'supervisory')) {
-            this.receivedSequence = args.receivedSequence
-        }
-        if ('sendSequence' in args && this.type === 'information') {
-            this.sendSequence = args.sendSequence
-        }
+        this.commandOrResponse = 'commandOrResponse' in args && args.commandOrResponse ? args.commandOrResponse : found.commandOrResponse
+        this.pollOrFinal = 'pollOrFinal' in args && typeof args.pollOrFinal !== 'undefined' ? args.pollOrFinal : found.pollOrFinal
+        this.receivedSequence = 'receivedSequence' in args && (this.type === 'information' || this.type === 'supervisory') ? args.receivedSequence : undefined
+        this.sendSequence = 'sendSequence' in args && this.type === 'information' ? args.sendSequence : undefined
         if ('pid' in args && (this.type === 'information' || this.subtype === 'UI')) {
             this.pid = args.pid ?? 0xF0
         }
@@ -123,7 +105,6 @@ export abstract class OutboundFrame extends BaseAbstract {
     protected static encodeAddressField(callsign: string, commandOrHasBeenRepeated: boolean, reservedBitOne: boolean, reservedBitTwo: boolean, ssid: number, finalAddress: boolean): number[] {
 
         // no need to do preflight checks in this protected method, already done via the setters
-
         callsign = callsign.padEnd(6)
 
         // empty array to hold our encoded results
@@ -134,19 +115,12 @@ export abstract class OutboundFrame extends BaseAbstract {
             bytes.push(callsign.charCodeAt(i) << 1)
         }
 
-        // get binary representation of the ssid and pad it with zeros to a length of 4
-        let ssidBinary = ssid.toString(2)
-        // while (ssidBinary.length < 4) {
-        //     ssidBinary = '0' + ssidBinary
-        // }
-        ssidBinary = ssidBinary.padStart(4, '0')
-
         // empty string to hold our 1s and 0s
         let bits: string = ''
         bits += commandOrHasBeenRepeated ? '1' : '0' // if command or has been repeated, push 1
         bits += reservedBitOne ? '0' : '1' // if reserved bit is being used, push 0, otherwise push 1 when not in use. very counterintuitive
         bits += reservedBitTwo ? '0' : '1' // if reserved bit is being used, push 0, otherwise push 1 when not in use. very counterintuitive
-        bits += ssidBinary
+        bits += ssid.toString(2).padStart(4, '0') // get binary representation of the ssid and pad it with zeros to a length of 4
         bits += finalAddress ? '1' : '0' // used to indicate whether this is the last address or not
 
         bytes.push(parseInt(bits, 2))
@@ -162,15 +136,9 @@ export abstract class OutboundFrame extends BaseAbstract {
         if (typeof bitsOne === 'number') {
             bitsOne = bitsOne.toString(2)
             if (modulo === 8) {
-                // while (bitsOne.length < 3) {
-                //     bitsOne = '0' + bitsOne
-                // }
                 bitsOne = bitsOne.padStart(3, '0')
             }
             else {
-                // while (bitsOne.length < 7) {
-                //     bitsOne = '0' + bitsOne
-                // }
                 bitsOne = bitsOne.padStart(7, '0')
             }
         }
@@ -180,15 +148,9 @@ export abstract class OutboundFrame extends BaseAbstract {
         if (typeof bitsTwo === 'number') {
             bitsTwo = bitsTwo.toString(2)
             if (modulo === 8) {
-                // while (bitsTwo.length < 3) {
-                //     bitsTwo = '0' + bitsTwo
-                // }
                 bitsTwo = bitsTwo.padStart(3, '0')
             }
             else {
-                // while (bitsTwo.length < 7) {
-                //     bitsTwo = '0' + bitsTwo
-                // }
                 bitsTwo = bitsTwo.padStart(7, '0')
             }
             bitsTwo += '0' // if a number was passed in then it's an information frame, which gets an extra 0 at the end
@@ -214,10 +176,11 @@ export abstract class OutboundFrame extends BaseAbstract {
         return this._destinationCallsign
     }
     public set destinationCallsign(callsign: string) {
+        // uppercase per AX.25 spec, trim for prettiness, will repad at encode time
+        callsign = callsign.toUpperCase().trim()
         // pre flight check
         validateCallsign(callsign)
-        // uppercase per AX.25 spec, trim for prettiness, will repad at encode time
-        this._destinationCallsign = callsign.toUpperCase().trim()
+        this._destinationCallsign = callsign
         this._encoded = undefined
     }
 
@@ -231,7 +194,7 @@ export abstract class OutboundFrame extends BaseAbstract {
         this._encoded = undefined
     }
 
-    protected get destinationCommandBit(): boolean {
+    public get destinationCommandBit(): boolean {
         return this._destinationCommandBit;
     }
     protected set destinationCommandBit(value: boolean) {
@@ -258,10 +221,11 @@ export abstract class OutboundFrame extends BaseAbstract {
         return this._sourceCallsign
     }
     public set sourceCallsign(callsign: string) {
+        // uppercase per AX.25 spec, trim for prettiness, will repad at encode time
+        callsign = callsign.toUpperCase().trim()
         // pre flight check
         validateCallsign(callsign)
-        // uppercase per AX.25 spec, trim for prettiness, will repad at encode time
-        this._sourceCallsign = callsign.toUpperCase().trim()
+        this._sourceCallsign = callsign
         this._encoded = undefined
     }
 
@@ -275,7 +239,7 @@ export abstract class OutboundFrame extends BaseAbstract {
         this._encoded = undefined
     }
 
-    protected get sourceCommandBit(): boolean {
+    public get sourceCommandBit(): boolean {
         return this._sourceCommandBit;
     }
     protected set sourceCommandBit(value: boolean) {
@@ -298,15 +262,9 @@ export abstract class OutboundFrame extends BaseAbstract {
         this._encoded = undefined
     }
 
-    public get commandOrResponse(): 'command' | 'response' { // property is ephemeral and computed
-        // 1 and 0 respectively indicates a command frame
-        if (this.destinationCommandBit && !this.sourceCommandBit) {
-            return 'command'
-        }
-        // 0 and 1 respectively indicates a response frame
-        else {
-            return 'response'
-        }
+    public get commandOrResponse(): 'command' | 'response' { // computed property
+        // 1 and 0 indicates a command frame, 0 and 1 indicates a response frame
+        return (this.destinationCommandBit && !this.sourceCommandBit) ? 'command' : 'response'
     }
     protected set commandOrResponse(commandOrResponse: 'command' | 'response') {  // Not mutable on some frames.
         if (commandOrResponse === 'command') {
@@ -335,7 +293,6 @@ export abstract class OutboundFrame extends BaseAbstract {
     /** The repeater path you wish to use in sending the packet, or the path that the packet was received on. Default none if not defined. */
     public set repeaters(repeaters: Repeater[]) {
         // decided not to truncate since some people are still doing more than 2 repeaters hops even though it's against AX.25 spec, plus it's a stupid rule
-
         // uppercase everything
         this._repeaters = repeaters.map((r) => {
             r.callsign = r.callsign.toUpperCase()
@@ -352,7 +309,6 @@ export abstract class OutboundFrame extends BaseAbstract {
         return this._modulo
     }
     protected set modulo(modulo: 8 | 128) {
-
         // ignore call if frame is unnumbered
         if (this.type === 'unnumbered') {
             this._modulo = 8
@@ -362,11 +318,9 @@ export abstract class OutboundFrame extends BaseAbstract {
         const found = controlFieldCombinations.find((cc) => {
             return cc.frameSubtype === this.subtype && cc.modulo === modulo
         })
-
         if (typeof found === 'undefined') {
             throw new Error(`${this.subtype} frames with a modulo of ${modulo} do not exist.`);
         }
-
         this._modulo = modulo
         if (found.binaryOne) {
             this.binaryOne = found.binaryOne
@@ -427,11 +381,11 @@ export abstract class OutboundFrame extends BaseAbstract {
         this._encoded = undefined
     }
 
-    protected get payload(): string | undefined { // only exists on information, UI, XID, and TEST frames
+    protected get payload(): any { // only exists on information, UI, XID, and TEST frames
         return this._payload
     }
-    /** Set the payload/body of your packet frame. Can be anything serializable, ex. a string, number, JSON, etc */
-    protected set payload(payload: string) { // not mutable on XID frames
+    /** Set the payload/body of your packet frame. */
+    protected set payload(payload: any) { // not mutable on XID frames
         this._payload = payload
         this._encoded = undefined
     }
@@ -445,7 +399,7 @@ export abstract class OutboundFrame extends BaseAbstract {
         let encRet: number[] = []
 
         // encode and push destination address field
-        encRet.push(...OutboundFrame.encodeAddressField(
+        encRet.push(...OutgoingFrame.encodeAddressField(
             this.destinationCallsign, // already uppercased via this.setDestinationCallsign() and gets padded in OutgoingFrame.encodeAddressField
             this.destinationCommandBit,
             this.destinationReservedBitOne, // currently unused
@@ -455,7 +409,7 @@ export abstract class OutboundFrame extends BaseAbstract {
         ))
 
         // encode and push source address field
-        encRet.push(...OutboundFrame.encodeAddressField(
+        encRet.push(...OutgoingFrame.encodeAddressField(
             this.sourceCallsign, // already uppercased via KissConnection.setMyCallsign() and gets padded in OutgoingFrame.encodeAddressField
             this.sourceCommandBit,
             this.sourceReservedBitOne,
@@ -468,7 +422,7 @@ export abstract class OutboundFrame extends BaseAbstract {
         if (this.repeaters.length > 0) {
             for (let i = 0; i < this.repeaters.length; i++) {
                 encRet.push(...
-                    OutboundFrame.encodeAddressField(
+                    OutgoingFrame.encodeAddressField(
                         this.repeaters[i].callsign,
                         this.repeaters[i].hasBeenRepeated ?? false, // indicates whether this repeater has already repeated the packet, this bit is flipped by the repeater
                         this.repeaters[i].reservedBitOne ?? false, // currently unused
@@ -483,36 +437,50 @@ export abstract class OutboundFrame extends BaseAbstract {
         // encode control field
         let ctl: number | number[]
         if (this.type === 'information') {
-            ctl = OutboundFrame.encodeControlField(this.modulo, this.receivedSequence!, this.pollOrFinal, this.sendSequence!)
+            ctl = OutgoingFrame.encodeControlField(this.modulo, this.receivedSequence!, this.pollOrFinal, this.sendSequence!)
         }
         else if (this.type === 'unnumbered') {
-            ctl = OutboundFrame.encodeControlField(this.modulo, this.binaryOne!, this.pollOrFinal, this.binaryTwo!)
+            ctl = OutgoingFrame.encodeControlField(this.modulo, this.binaryOne!, this.pollOrFinal, this.binaryTwo!)
         }
         else {
-            ctl = OutboundFrame.encodeControlField(this.modulo, this.receivedSequence!, this.pollOrFinal, this.binaryTwo!)
+            ctl = OutgoingFrame.encodeControlField(this.modulo, this.receivedSequence!, this.pollOrFinal, this.binaryTwo!)
         }
-        if (Array.isArray(ctl)) {
-            encRet.push(...ctl)
-        }
-        else {
-            encRet.push(ctl)
-        }
+        Array.isArray(ctl) ? encRet.push(...ctl) : encRet.push(ctl)
 
         if (this.subtype === 'UI' || this.subtype === 'I') {
             encRet.push(this.pid ?? 0xF0)
         }
 
         if (this.subtype === 'UI' || this.subtype === 'I' || this.subtype === 'TEST' ) { // ignore XID because it has its own separate encoding procedure
-
-            // protect against undefined errors
-            if (typeof this.payload === 'undefined') {
-                this.payload = ''
+            switch (typeof this.payload) {
+                case "string":
+                case "number":
+                case "bigint":
+                case "boolean":
+                case "function":
+                    encRet.push(...new TextEncoder().encode(String(this.payload)))
+                    break;
+                case "object":
+                    if (isPromise(this.payload)) {
+                        throw new Error(`${this.subtype} frame's payload is a promise, resolve all promises to a value before setting them as the payload.`)
+                    }
+                    else if (
+                        (Array.isArray(this.payload) && this.payload.every(item => typeof item === 'number')) ||
+                        Buffer.isBuffer(this.payload) ||
+                        this.payload instanceof Uint8Array ||
+                        this.payload instanceof Uint8ClampedArray
+                    ) {
+                        encRet.push(...this.payload)
+                    }
+                    else {
+                        encRet.push(...new TextEncoder().encode(JSON.stringify(this.payload)))
+                    }
+                    break;
+                case "undefined":
+                    break; // do nothing
+                case "symbol":
+                    throw new Error(`Invalid payload on ${this.subtype} frame. Symbols cannot be serialized.`)
             }
-
-            this.payload.split('').map((c) => {
-                encRet.push(c.charCodeAt(0))
-            })
-
         }
         else if (this.subtype === 'XID') { // the xid payload is just raw numbers
             encRet.push(...[
@@ -541,11 +509,11 @@ export abstract class OutboundFrame extends BaseAbstract {
     }
 
     // convenience method
-    public async send(): Promise<void> {
+    public send(): void {
         if (typeof this.kissConnection === 'undefined') {
-            return Promise.reject(new Error('A valid KISS connection must be set to call the OutboundFrame.send() method.'))
+            throw new Error('A valid KISS connection must be set to call the OutgoingFrame.send() method.')
         }
-        return this.kissConnection.send(this)
+        this.kissConnection.write(this)
     }
 
 }

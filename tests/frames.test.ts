@@ -1,20 +1,5 @@
-import { test, describe, expect, beforeAll } from 'bun:test'
-import { IFrame, InboundFrame, KissConnection, type SerialKissConstructor, type TcpKissConstructor, UIFrame } from './src/index.js'
-import { Socket } from 'net'
-import { SerialPort } from 'serialport'
-import { setTimeout } from 'timers/promises'
-
-const MY_CALL: string = 'KO4LCM'
-const MY_SSID: number = 9
-const THEIR_CALL: string = 'N0CALL'
-const THEIR_SSID: number = 1
-const MODEM_PATH: string = "C:\\Program Files\\soundmodem114\\soundmodem.exe"
-const KISS_CONSTRUCTOR: TcpKissConstructor | SerialKissConstructor = {
-    host: 'localhost',
-    port: 8100
-}
-
-/********** DO NOT MODIFY BELOW THIS LINE **********/
+import { beforeAll, describe, expect, test } from 'bun:test'
+import { IFrame, InboundFrame, UIFrame } from '../src/index.js'
 
 let original1: UIFrame
 let original2: IFrame
@@ -26,8 +11,6 @@ let encoded3: number[]
 let decoded1: InboundFrame
 let decoded2: InboundFrame
 let decoded3: InboundFrame
-
-let kissConnection: KissConnection
 
 beforeAll(() => {
 
@@ -241,26 +224,5 @@ describe('decoded matches original', () => {
         expect(decoded1.payload).toBe(original1.payload)
         expect(decoded2.payload).toBe(original2.payload)
         expect(decoded3.payload).toBe('!2135.50NT15806.44W& Haleiwa / North Shore Oahu Hawaii USA')
-    })
-})
-
-describe('KissConnection', () => {
-
-    beforeAll(async () => {
-        Bun.spawn([MODEM_PATH])
-        await setTimeout(2000)
-        kissConnection = new KissConnection(KISS_CONSTRUCTOR)
-    })
-
-    test('instanceof and isTcp and isSerial', () => {
-        expect(kissConnection.connection instanceof Socket || kissConnection.connection instanceof SerialPort).toBeTrue()
-        expect(kissConnection.connection instanceof Socket).toBe(kissConnection.isTcp)
-        expect(kissConnection.connection instanceof SerialPort).toBe(kissConnection.isSerial)
-        expect(kissConnection.isTcp).toBe(!kissConnection.isSerial)
-        expect(kissConnection.isSerial).toBe(!kissConnection.isTcp)
-    })
-
-    test('.txBaud', () => {
-        expect(kissConnection.txBaud).toBe(1200)
     })
 })
