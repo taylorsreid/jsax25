@@ -27,16 +27,10 @@ export class IncomingFrame extends BaseAbstract {
     public readonly encoded: number[];
     public readonly kissConnection: KissConnection | undefined;
 
-    constructor(encodedKissFrame: Buffer, kissConnection?: KissConnection | TcpKissConstructor | SerialKissConstructor, modulo: 8 | 128 = 8) {
+    constructor(encodedKissFrame: number[], kissConnection?: KissConnection | TcpKissConstructor | SerialKissConstructor, modulo: 8 | 128 = 8) {
         super()
 
-        // regular arrays have more convenience methods
-        this.encoded = Array.from(encodedKissFrame)
-
-        // doing this after modulo assignment causes a weird race condition in Bun
-        if (this.encoded[0] === 0xC0) {
-            this.encoded.shift()
-        }
+        this.encoded = encodedKissFrame
 
         //
         this.modulo = modulo
@@ -66,28 +60,28 @@ export class IncomingFrame extends BaseAbstract {
     /** Get the destination amateur radio callsign. */
     public get destinationCallsign(): string {
         if (typeof this._destinationCallsign === 'undefined') {
-            this._destinationCallsign = IncomingFrame.decodeCallsign(this.encoded.slice(1, 7))
+            this._destinationCallsign = IncomingFrame.decodeCallsign(this.encoded.slice(2, 8))
         }
         return this._destinationCallsign
     }
 
     public get destinationCommandBit(): boolean {
         if (typeof this._destinationCommandBit === 'undefined') {
-            this._destinationCommandBit = this.encoded[7].toString(2).padStart(8, '0').startsWith('1')
+            this._destinationCommandBit = this.encoded[8].toString(2).padStart(8, '0').startsWith('1')
         }
         return this._destinationCommandBit
     }
 
     public get destinationReservedBitOne(): boolean {
         if (typeof this._destinationReservedBitOne === 'undefined') {
-            this._destinationReservedBitOne = this.encoded[7].toString(2).padStart(8, '0')[1] === '0'
+            this._destinationReservedBitOne = this.encoded[8].toString(2).padStart(8, '0')[1] === '0'
         }
         return this._destinationReservedBitOne
     }
 
     public get destinationReservedBitTwo(): boolean {
         if (typeof this._destinationReservedBitTwo === 'undefined') {
-            this._destinationReservedBitTwo = this.encoded[7].toString(2).padStart(8, '0')[2] === '0'
+            this._destinationReservedBitTwo = this.encoded[8].toString(2).padStart(8, '0')[2] === '0'
         }
         return this._destinationReservedBitTwo
     }
@@ -95,7 +89,7 @@ export class IncomingFrame extends BaseAbstract {
     /** Get the destination's SSID. */
     public get destinationSsid(): number {
         if (typeof this._destinationSsid === 'undefined') {
-            this._destinationSsid = parseInt(this.encoded[7].toString(2).padStart(8, '0').slice(3, 7), 2)
+            this._destinationSsid = parseInt(this.encoded[8].toString(2).padStart(8, '0').slice(3, 7), 2)
         }
         return this._destinationSsid
     }
@@ -103,27 +97,27 @@ export class IncomingFrame extends BaseAbstract {
     /** Get the sender's amateur radio callsign. */
     public get sourceCallsign(): string {
         if (typeof this._sourceCallsign === 'undefined') {
-            this._sourceCallsign = IncomingFrame.decodeCallsign(this.encoded.slice(8, 14))
+            this._sourceCallsign = IncomingFrame.decodeCallsign(this.encoded.slice(9, 15))
         }
         return this._sourceCallsign
     }
 
     public get sourceCommandBit(): boolean {
         if (typeof this._sourceCommandBit === 'undefined') {
-            this._sourceCommandBit = this.encoded[14].toString(2).padStart(8, '0').startsWith('1')
+            this._sourceCommandBit = this.encoded[15].toString(2).padStart(8, '0').startsWith('1')
         }
         return this._sourceCommandBit
     }
 
     public get sourceReservedBitOne(): boolean {
         if (typeof this._sourceReservedBitOne === 'undefined') {
-            this._sourceReservedBitOne = this.encoded[14].toString(2).padStart(8, '0')[1] === '0'
+            this._sourceReservedBitOne = this.encoded[15].toString(2).padStart(8, '0')[1] === '0'
         }
         return this._sourceReservedBitOne
     }
     public get sourceReservedBitTwo(): boolean {
         if (typeof this._sourceReservedBitTwo === 'undefined') {
-            this._sourceReservedBitTwo = this.encoded[14].toString(2).padStart(8, '0')[2] === '0'
+            this._sourceReservedBitTwo = this.encoded[15].toString(2).padStart(8, '0')[2] === '0'
         }
         return this._sourceReservedBitTwo
     }
@@ -131,7 +125,7 @@ export class IncomingFrame extends BaseAbstract {
     /** Get the sender's SSID. */
     public get sourceSsid(): number {
         if (typeof this._sourceSsid === 'undefined') {
-            this._sourceSsid = parseInt(this.encoded[14].toString(2).padStart(8, '0').slice(3, 7), 2)
+            this._sourceSsid = parseInt(this.encoded[15].toString(2).padStart(8, '0').slice(3, 7), 2)
         }
         return this._sourceSsid
     }
@@ -167,7 +161,7 @@ export class IncomingFrame extends BaseAbstract {
     public get repeaters(): Repeater[] {
         if (typeof this._repeaters === 'undefined') {
             this._repeaters = [] // initialize
-            let position: number = 15
+            let position: number = 16
             while (this.encoded[position - 1].toString(2).endsWith('0')) {
                 this._repeaters.push({
                     callsign: IncomingFrame.decodeCallsign(this.encoded.slice(position, position + 6)),
@@ -182,7 +176,7 @@ export class IncomingFrame extends BaseAbstract {
 
     private getControlFieldBits(): string {
         // TODO: EXPLAIN
-        return (this.modulo === 8) ? this.encoded[15 + (7 * this.repeaters.length)].toString(2).padStart(8, '0') : this.encoded[15 + (7 * this.repeaters.length)].toString(2).padStart(8, '0') + this.encoded[16 + (7 * this.repeaters.length)].toString(2).padStart(8, '0')
+        return (this.modulo === 8) ? this.encoded[16 + (7 * this.repeaters.length)].toString(2).padStart(8, '0') : this.encoded[16 + (7 * this.repeaters.length)].toString(2).padStart(8, '0') + this.encoded[17 + (7 * this.repeaters.length)].toString(2).padStart(8, '0')
     }
 
     public get type(): FrameType {
@@ -256,7 +250,7 @@ export class IncomingFrame extends BaseAbstract {
      */
     public get pid(): number | undefined {
         if (typeof this._pid === 'undefined' && (this.subtype === 'I' || this.subtype === 'UI')) { // only exist on I and UI frames
-            this._pid = this.encoded[16 + (7 * this.repeaters.length)]
+            this._pid = this.encoded[17 + (7 * this.repeaters.length)]
         }
         return this._pid
     }
@@ -266,7 +260,7 @@ export class IncomingFrame extends BaseAbstract {
             // this._payload = ''
 
             // ternary accounts for the presence of a pid field
-            let position: number = ((this.subtype === 'I' || this.subtype === 'UI') ? 17 : 16) + (7 * this.repeaters.length)
+            let position: number = ((this.subtype === 'I' || this.subtype === 'UI') ? 18 : 17) + (7 * this.repeaters.length)
 
             // decode all the way until the frame end flag since kiss frames have a 0xC0 at the end of the frame
             // this._payload = String.fromCharCode(...this.encoded.slice(position, this.encoded.lastIndexOf(0xC0)))
