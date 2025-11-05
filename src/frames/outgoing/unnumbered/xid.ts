@@ -1,5 +1,5 @@
-import type { mutableCommandOrResponse, mutablePollOrFinal } from "../../../misc.js";
-import { OutgoingFrame, type OutgoingConstructor } from "../outgoing.js";
+import type { mutableCommandOrResponse, mutablePollOrFinal } from "../../../misc";
+import { OutgoingFrame, type OutgoingConstructor } from "../outgoing";
 
 export interface XIDFrameConstructor extends OutgoingConstructor {
     commandOrResponse?: 'command' | 'response'

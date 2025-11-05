@@ -1,5 +1,5 @@
-import type { hasPayload, hasPid, hasReceivedSequence, hasSendSequence, mutableModulo, mutablePollOrFinal, } from "../../misc.js";
-import { OutgoingFrame, type OutgoingConstructor } from "./outgoing.js";
+import type { hasPayload, hasPid, hasReceivedSequence, hasSendSequence, mutableModulo, mutablePollOrFinal, } from "../../misc";
+import { OutgoingFrame, type OutgoingConstructor } from "./outgoing";
 
 export interface IFrameConstructor extends OutgoingConstructor {
     modulo?: 8 | 128

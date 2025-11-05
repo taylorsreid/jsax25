@@ -1,5 +1,5 @@
-import type { Repeater } from "../misc.js"
 import util from "node:util"
+import type { Repeater } from "../misc"
 
 export type FrameType = 'information' | 'supervisory' | 'unnumbered'
 export type SFrameType = 'RR' | 'RNR' | 'REJ' | 'SREJ'

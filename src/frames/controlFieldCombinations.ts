@@ -1,4 +1,4 @@
-import type { FrameType, IFrameType, SFrameType, UFrameType } from "./baseabstract.js";
+import type { FrameType, IFrameType, SFrameType, UFrameType } from "./baseabstract";
 
 export interface ControlFieldCombination {
     frameType: FrameType,

@@ -1,5 +1,5 @@
-import type { hasPayload, mutableCommandOrResponse } from "../../../misc.js";
-import { OutgoingFrame, type OutgoingConstructor } from "../outgoing.js";
+import type { hasPayload, mutableCommandOrResponse } from "../../../misc";
+import { OutgoingFrame, type OutgoingConstructor } from "../outgoing";
 
 export interface TestFrameConstructor extends OutgoingConstructor {
     commandOrResponse?: 'command' | 'response'

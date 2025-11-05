@@ -1,5 +1,5 @@
-import type { hasPayload, hasPid, mutableCommandOrResponse, mutablePollOrFinal } from "../../../misc.js";
-import { OutgoingFrame, type OutgoingConstructor } from "../outgoing.js";
+import type { hasPayload, hasPid, mutableCommandOrResponse, mutablePollOrFinal } from "../../../misc";
+import { OutgoingFrame, type OutgoingConstructor } from "../outgoing";
 
 export interface UIFrameConstructor extends OutgoingConstructor {
     commandOrResponse?: 'command' | 'response'

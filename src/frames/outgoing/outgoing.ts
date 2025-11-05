@@ -1,14 +1,14 @@
 import { isPromise } from "util/types";
-import { KissConnection, type SerialKissConstructor, type TcpKissConstructor } from "../../index.js";
-import { validateCallsign, validateSsid, type Repeater } from "../../misc.js";
-import { BaseAbstract, type FrameSubtype, type FrameType } from "../baseabstract.js";
-import { controlFieldCombinations } from "../controlFieldCombinations.js";
-import type { IFrameConstructor } from './information.js';
-import type { SREJFrameConstructor } from './supervisory/srej.js';
-import type { SFrameConstructor } from './supervisory/supervisoryabstract.js';
-import type { TestFrameConstructor } from './unnumbered/test.js';
-import type { UIFrameConstructor } from './unnumbered/ui.js';
-import type { XIDFrameConstructor } from './unnumbered/xid.js';
+import { KissConnection, type SerialKissConstructor, type TcpKissConstructor } from "../../index";
+import { validateCallsign, validateSsid, type Repeater } from "../../misc";
+import { BaseAbstract, type FrameSubtype, type FrameType } from "../baseabstract";
+import { controlFieldCombinations } from "../controlFieldCombinations";
+import type { IFrameConstructor } from './information';
+import type { SREJFrameConstructor } from './supervisory/srej';
+import type { SFrameConstructor } from './supervisory/supervisoryabstract';
+import type { TestFrameConstructor } from './unnumbered/test';
+import type { UIFrameConstructor } from './unnumbered/ui';
+import type { XIDFrameConstructor } from './unnumbered/xid';
 
 export interface OutgoingConstructor {
     /** A configured and active KissConnection to send the outgoing frame on. */

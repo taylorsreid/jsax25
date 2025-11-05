@@ -1,8 +1,8 @@
-import { DISCFrame, DMFrame, IFrame, KissConnection, REJFrame, RNRFrame, RRFrame, SABMEFrame, SABMFrame, SREJFrame, TESTFrame, UAFrame, UIFrame, XIDFrame, type IFrameConstructor, type OutgoingConstructor, type SFrameConstructor, type SREJFrameConstructor, type TestFrameConstructor, type UIFrameConstructor, type XIDFrameConstructor } from 'index.js';
-import type { SerialKissConstructor, TcpKissConstructor } from 'kissconnection.js';
-import { resetRepeaters, type Repeater } from "../misc.js";
-import { BaseAbstract, type FrameSubtype, type FrameType } from "./baseabstract.js";
-import { controlFieldCombinations, type ControlFieldCombination } from './controlFieldCombinations.js';
+import { KissConnection, type SerialKissConstructor, type TcpKissConstructor } from '../kissconnection';
+import { resetRepeaters, type Repeater } from "../misc";
+import { BaseAbstract, type FrameSubtype, type FrameType } from "./baseabstract";
+import { controlFieldCombinations, type ControlFieldCombination } from './controlFieldCombinations';
+import { DISCFrame, DMFrame, IFrame, REJFrame, RNRFrame, RRFrame, SABMEFrame, SABMFrame, SREJFrame, TESTFrame, UAFrame, UIFrame, XIDFrame, type IFrameConstructor, type OutgoingConstructor, type SFrameConstructor, type SREJFrameConstructor, type TestFrameConstructor, type UIFrameConstructor, type XIDFrameConstructor } from './index';
 
 export class IncomingFrame extends BaseAbstract {
     protected _destinationCallsign: string | undefined;
@@ -293,6 +293,8 @@ export class IncomingFrame extends BaseAbstract {
         c.commandOrResponse = commandOrResponse
         return c
     }
+
+    // TODO: move all methods to a reply() or replyWith() method
 
     public newREJFrame(receivedSequence: number, pollOrFinal: boolean, commandOrResponse: 'command' | 'response'): REJFrame {
         return new REJFrame(this.sResponseConstructor(receivedSequence, pollOrFinal, commandOrResponse))

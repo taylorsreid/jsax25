@@ -1,4 +1,4 @@
-import { SupervisoryAbstract, type SFrameConstructor } from "./supervisoryabstract.js";
+import { SupervisoryAbstract, type SFrameConstructor } from "./supervisoryabstract";
 
 export class RNRFrame extends SupervisoryAbstract {
     constructor(args: SFrameConstructor) {

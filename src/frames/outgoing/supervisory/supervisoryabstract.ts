@@ -1,6 +1,6 @@
-import type { hasReceivedSequence, mutableCommandOrResponse, mutableModulo, mutablePollOrFinal } from "../../../misc.js";
-import type { SFrameType } from "../../baseabstract.js";
-import { OutgoingFrame, type OutgoingConstructor } from "../outgoing.js";
+import type { hasReceivedSequence, mutableCommandOrResponse, mutableModulo, mutablePollOrFinal } from "../../../misc";
+import type { SFrameType } from "../../baseabstract";
+import { OutgoingFrame, type OutgoingConstructor } from "../outgoing";
 
 export interface SFrameConstructor extends OutgoingConstructor {
     modulo?: 8 | 128

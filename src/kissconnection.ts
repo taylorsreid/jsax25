@@ -1,8 +1,9 @@
-import { OutgoingFrame } from 'frames/outgoing/outgoing.js';
 import { Socket, createConnection } from 'net';
 import { SerialPort } from 'serialport';
 import Stream from 'stream';
-import { IncomingFrame } from './index.js';
+import { IncomingFrame } from './frames/incoming';
+import { OutgoingFrame } from './frames/outgoing/outgoing';
+
 
 interface BaseKissConstructor {
     txBaud?: number
@@ -111,7 +112,7 @@ export class KissConnection extends Stream.Duplex {
     // TODO: does this work?
     public override _read(size: number): void {
         const data: Buffer | null = this.connection.read()
-        this.push(data ? new IncomingFrame(data, this) : data)
+        this.push(data ? new IncomingFrame(Array.from(data), this) : data)
     }
 
     public override write(frame: OutgoingFrame, callback?: (error: Error | null | undefined) => void): boolean
