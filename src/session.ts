@@ -1,6 +1,8 @@
-// import { DISCFrame, DMFrame, IFrame, InboundFrame, UAFrame } from "../frames/index.js"
-// import { resetRepeaters, validateCallsign, validatePid, validateSsid, type Repeater } from "../misc.js"
-// import type { TNC } from "./tnc.js"
+// // TODO: salvage usable relevant code for TNC
+
+// import { DISCFrame, DMFrame, IFrame, IncomingFrame, UAFrame } from "./index"
+// import { resetRepeaters, validateCallsign, validatePid, validateSsid, type Repeater } from "./misc"
+// import type { TNC } from "./tnc"
 
 // export interface SessionConstructor {
 //     tnc: TNC
@@ -246,11 +248,11 @@
 //     public async receive(): Promise<string>
 //     public async receive(mode: 'concat'): Promise<string>
 //     public async receive(mode: 'payloadArray'): Promise<string[]>
-//     public async receive(mode: 'frameArray'): Promise<InboundFrame[]>
-//     public async receive(mode: 'concat' | 'payloadArray' | 'frameArray' = 'concat'): Promise< string | string[] | InboundFrame[] > {
-//         return new Promise< string | string[] | InboundFrame[] >((resolve) => {
-//             const frameArray: InboundFrame[] = []
-//             const handler = (frame: InboundFrame) => {
+//     public async receive(mode: 'frameArray'): Promise<IncomingFrame[]>
+//     public async receive(mode: 'concat' | 'payloadArray' | 'frameArray' = 'concat'): Promise< string | string[] | IncomingFrame[] > {
+//         return new Promise< string | string[] | IncomingFrame[] >((resolve) => {
+//             const frameArray: IncomingFrame[] = []
+//             const handler = (frame: IncomingFrame) => {
 //                 if (
 //                     frame.destinationCallsign === this.tnc.myCall &&
 //                     frame.destinationSsid === this.tnc.mySsid &&
