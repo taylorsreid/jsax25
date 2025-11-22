@@ -1,5 +1,4 @@
 node_modules/
 dist/
-modulo128Cache/
 tsconfig.tsbuildinfo
 scratch.ts
