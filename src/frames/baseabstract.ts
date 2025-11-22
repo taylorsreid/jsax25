@@ -31,7 +31,6 @@ export abstract class BaseAbstract {
     protected abstract sendSequence: number | undefined
     protected abstract pid: number | undefined
     protected abstract payload: any
-    public abstract encoded: number[]
 
     public toJSON() {
         return {
@@ -59,6 +58,10 @@ export abstract class BaseAbstract {
             pid: this.pid,
             payload: this.payload
         }
+    }
+
+    public toString(): string {
+        return JSON.stringify(this.toJSON())
     }
 
     [util.inspect.custom] = () => {

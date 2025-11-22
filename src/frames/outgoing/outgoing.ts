@@ -1,6 +1,5 @@
 import { isPromise } from "util/types";
-import { KissConnection, type SerialKissConstructor, type TcpKissConstructor } from "../../index";
-import { validateCallsign, validateSsid, type Repeater } from "../../misc";
+import { validateCallsign, validatePid, validateSsid, type Repeater } from "../../misc";
 import { BaseAbstract, type FrameSubtype, type FrameType } from "../baseabstract";
 import { controlFieldCombinations } from "../controlFieldCombinations";
 import type { IFrameConstructor } from './information';
@@ -11,8 +10,6 @@ import type { UIFrameConstructor } from './unnumbered/ui';
 import type { XIDFrameConstructor } from './unnumbered/xid';
 
 export interface OutgoingConstructor {
-    /** A configured and active KissConnection to send the outgoing frame on. */
-    kissConnection?: KissConnection | TcpKissConstructor | SerialKissConstructor
     /** The amateur radio callsign of the remote station. */
     destinationCallsign: string
     /** The SSID of the remote station, default is 0. */
@@ -37,17 +34,16 @@ export abstract class OutgoingFrame extends BaseAbstract {
     // all ! properties are set via setters and/or the controlFieldCombinations search
     public readonly subtype: FrameSubtype
     public readonly type: FrameType
-    private _kissConnection: KissConnection | undefined
     private _destinationCallsign!: string
     private _destinationSsid!: number
     private _destinationCommandBit!: boolean;  // set by commandOrResponse setter and/or the controlFieldCombinations search
-    private _destinationReservedBitOne!: boolean;
-    private _destinationReservedBitTwo!: boolean;
+    public destinationReservedBitOne: boolean;
+    public destinationReservedBitTwo: boolean;
     private _sourceCallsign!: string
     private _sourceSsid!: number
     private _sourceCommandBit!: boolean;  // set by commandOrResponse setter and/or the controlFieldCombinations search
-    private _sourceReservedBitOne!: boolean;
-    private _sourceReservedBitTwo!: boolean;
+    public sourceReservedBitOne: boolean;
+    public sourceReservedBitTwo: boolean;
     private _repeaters!: Repeater[];
     private _modulo: 8 | 128;
     private binaryOne: string | undefined;
@@ -57,27 +53,21 @@ export abstract class OutgoingFrame extends BaseAbstract {
     private _sendSequence: number | undefined
     private _pid: number | undefined;
     private _payload: any
-    private _encoded: number[] | undefined
 
     constructor(args: OutgoingConstructor | IFrameConstructor | SFrameConstructor | SREJFrameConstructor | TestFrameConstructor | UIFrameConstructor | XIDFrameConstructor, frameSubtype: FrameSubtype) {
 
         super()
-
+        
         this._modulo = ('modulo' in args && typeof args.modulo !== 'undefined') ? args.modulo : 8
 
         const found = controlFieldCombinations.find((cc) => {
             return cc.frameSubtype === frameSubtype && cc.modulo === this.modulo
-        })
-
-        if (!found) {
-            throw new Error(`Invalid combination of a ${frameSubtype} frame and modulo ${this.modulo}, this combination does not exist.`)
-        }
+        })! // all valid frame types are listed
 
         this.type = found.frameType
         this.subtype = found.frameSubtype
         this.binaryOne = found.binaryOne
         this.binaryTwo = found.binaryTwo
-        this.kissConnection = args.kissConnection
         this.destinationCallsign = args.destinationCallsign
         this.destinationSsid = args.destinationSsid
         this.destinationReservedBitOne = args?.destinationReservedBitOne ?? false
@@ -160,18 +150,6 @@ export abstract class OutgoingFrame extends BaseAbstract {
         return (modulo === 8) ? parseInt(bitsOne + bitsTwo, 2) : [parseInt(bitsOne, 2), parseInt(bitsTwo, 2)]
     }
 
-    public get kissConnection(): KissConnection | undefined {
-        return this._kissConnection
-    }
-    public set kissConnection(kissConnection: KissConnection | TcpKissConstructor | SerialKissConstructor | undefined) {
-        if (kissConnection instanceof KissConnection || typeof kissConnection === 'undefined') {
-            this._kissConnection = kissConnection
-        }
-        else {
-            this._kissConnection = new KissConnection(kissConnection)
-        }
-    }
-
     public get destinationCallsign(): string {
         return this._destinationCallsign
     }
@@ -181,7 +159,6 @@ export abstract class OutgoingFrame extends BaseAbstract {
         // pre flight check
         validateCallsign(callsign)
         this._destinationCallsign = callsign
-        this._encoded = undefined
     }
 
     public get destinationSsid(): number {
@@ -191,7 +168,6 @@ export abstract class OutgoingFrame extends BaseAbstract {
         // pre flight check
         validateSsid(ssid)
         this._destinationSsid = ssid
-        this._encoded = undefined
     }
 
     public get destinationCommandBit(): boolean {
@@ -199,22 +175,6 @@ export abstract class OutgoingFrame extends BaseAbstract {
     }
     protected set destinationCommandBit(value: boolean) {
         this._destinationCommandBit = value;
-    }
-
-    public get destinationReservedBitOne(): boolean {
-        return this._destinationReservedBitOne
-    }
-    public set destinationReservedBitOne(on: boolean) {
-        this._destinationReservedBitOne = on
-        this._encoded = undefined
-    }
-
-    public get destinationReservedBitTwo(): boolean {
-        return this._destinationReservedBitTwo
-    }
-    public set destinationReservedBitTwo(on: boolean) {
-        this._destinationReservedBitTwo = on
-        this._encoded = undefined
     }
 
     public get sourceCallsign(): string {
@@ -226,7 +186,6 @@ export abstract class OutgoingFrame extends BaseAbstract {
         // pre flight check
         validateCallsign(callsign)
         this._sourceCallsign = callsign
-        this._encoded = undefined
     }
 
     public get sourceSsid(): number {
@@ -236,7 +195,6 @@ export abstract class OutgoingFrame extends BaseAbstract {
         // pre flight check
         validateSsid(ssid)
         this._sourceSsid = ssid
-        this._encoded = undefined
     }
 
     public get sourceCommandBit(): boolean {
@@ -244,22 +202,6 @@ export abstract class OutgoingFrame extends BaseAbstract {
     }
     protected set sourceCommandBit(value: boolean) {
         this._sourceCommandBit = value;
-    }
-
-    public get sourceReservedBitOne(): boolean {
-        return this._sourceReservedBitOne
-    }
-    public set sourceReservedBitOne(on: boolean) {
-        this._sourceReservedBitOne = on
-        this._encoded = undefined
-    }
-
-    public get sourceReservedBitTwo(): boolean {
-        return this._sourceReservedBitTwo
-    }
-    public set sourceReservedBitTwo(on: boolean) {
-        this._sourceReservedBitTwo = on
-        this._encoded = undefined
     }
 
     public get commandOrResponse(): 'command' | 'response' { // computed property
@@ -275,7 +217,6 @@ export abstract class OutgoingFrame extends BaseAbstract {
             this.destinationCommandBit = false
             this.sourceCommandBit = true
         }
-        this._encoded = undefined
     }
     public get isCommand(): boolean {
         return this.commandOrResponse === 'command'
@@ -296,10 +237,11 @@ export abstract class OutgoingFrame extends BaseAbstract {
         // uppercase everything
         this._repeaters = repeaters.map((r) => {
             r.callsign = r.callsign.toUpperCase()
+            validateCallsign(r.callsign)
             r.ssid ??= 0
+            validateSsid(r.ssid)
             return r
         })
-        this._encoded = undefined
     }
 
     public get modulo(): 8 | 128 {
@@ -309,40 +251,30 @@ export abstract class OutgoingFrame extends BaseAbstract {
         return this._modulo
     }
     protected set modulo(modulo: 8 | 128) {
-        // ignore call if frame is unnumbered
-        if (this.type === 'unnumbered') {
-            this._modulo = 8
-            return
-        }
-
         const found = controlFieldCombinations.find((cc) => {
             return cc.frameSubtype === this.subtype && cc.modulo === modulo
-        })
-        if (typeof found === 'undefined') {
-            throw new Error(`${this.subtype} frames with a modulo of ${modulo} do not exist.`);
-        }
+        })! // all valid frame types are listed
         this._modulo = modulo
-        if (found.binaryOne) {
-            this.binaryOne = found.binaryOne
-        }
-        if (found.binaryTwo) {
-            this.binaryTwo = found.binaryTwo
-        }
-        this._encoded = undefined
+        this.binaryOne = found.binaryOne
+        this.binaryTwo = found.binaryTwo
     }
 
     protected get receivedSequence(): number | undefined { // Doesn't exist on some frames.
         return this._receivedSequence
     }
     protected set receivedSequence(receivedSequence: number | undefined) {
-        if (this.modulo === 8 && typeof receivedSequence !== 'undefined' && (receivedSequence < 0 || receivedSequence > 7)) {
-            throw new Error(`Received sequence ${receivedSequence} must be between 0 and 7 inclusive when set to modulo 8.`)
-        }
-        else if (this.modulo === 128 && typeof receivedSequence !== 'undefined' && (receivedSequence < 0 || receivedSequence > 127)) {
-            throw new Error(`Received sequence ${receivedSequence} must be between 0 and 127 inclusive when set to modulo 128.`)
+        if (typeof receivedSequence !== 'undefined') {
+            if (!Number.isInteger(receivedSequence)) {
+                throw new Error(`Received sequence ${receivedSequence} must be an integer.`)
+            }
+            if (this.modulo === 8 && (receivedSequence < 0 || receivedSequence > 7)) {
+                throw new Error(`Received sequence ${receivedSequence} must be between 0 and 7 inclusive when set to modulo 8.`)
+            }
+            else if (this.modulo === 128 && (receivedSequence < 0 || receivedSequence > 127)) {
+                throw new Error(`Received sequence ${receivedSequence} must be between 0 and 127 inclusive when set to modulo 128.`)
+            }
         }
         this._receivedSequence = receivedSequence
-        this._encoded = undefined
     }
 
     public get pollOrFinal(): boolean {
@@ -350,35 +282,34 @@ export abstract class OutgoingFrame extends BaseAbstract {
     }
     protected set pollOrFinal(pollOrFinal: boolean) { // not mutable on some frames
         this._pollOrFinal = pollOrFinal
-        this._encoded = undefined
     }
 
     protected get sendSequence(): number | undefined { // only exists on information frames
         return this._sendSequence
     }
     protected set sendSequence(sendSequence: number | undefined) {
-        if (this.modulo === 8 && typeof sendSequence !== 'undefined' && (sendSequence < 0 || sendSequence > 7)) {
-            throw new Error(`Send sequence ${sendSequence} must be between 0 and 7 inclusive when set to modulo 8.`)
-        }
-        else if (this.modulo === 128 && typeof sendSequence !== 'undefined' && (sendSequence < 0 || sendSequence > 127)) {
-            throw new Error(`Send sequence ${sendSequence} must be between 0 and 127 inclusive when set to modulo 128.`)
+        if (typeof sendSequence !== 'undefined') {
+            if (!Number.isInteger(sendSequence)) {
+                throw new Error(`Send sequence ${sendSequence} must be an integer.`)
+            }
+            if (this.modulo === 8 && (sendSequence < 0 || sendSequence > 7)) {
+                throw new Error(`Send sequence ${sendSequence} must be between 0 and 7 inclusive when set to modulo 8.`)
+            }
+            else if (this.modulo === 128 && (sendSequence < 0 || sendSequence > 127)) {
+                throw new Error(`Send sequence ${sendSequence} must be between 0 and 127 inclusive when set to modulo 128.`)
+            }
         }
         this._sendSequence = sendSequence
-        this._encoded = undefined
     }
 
     protected get pid(): number | undefined { // only exists on information and UI frames
-        if (this.type === 'information' || this.subtype === 'UI') {
-            return this._pid
-        }
-        return undefined
+        return this._pid
     }
     protected set pid(pid: number | undefined) { // only exists on information and UI frames
-        if (pid! < 0) {
-            throw new Error(`PID ${pid} is invalid. PID must be a positive number.`)
+        if (typeof pid === 'number') {
+            validatePid(pid)
         }
         this._pid = pid
-        this._encoded = undefined
     }
 
     protected get payload(): any { // only exists on information, UI, XID, and TEST frames
@@ -386,15 +317,16 @@ export abstract class OutgoingFrame extends BaseAbstract {
     }
     /** Set the payload/body of your packet frame. */
     protected set payload(payload: any) { // not mutable on XID frames
+        if (isPromise(payload)) {
+            throw new Error(`${this.subtype} frame's payload is a promise, resolve all promises to a value before setting them as the payload.`)
+        }
+        else if (typeof payload === 'symbol') {
+            throw new Error(`Invalid payload on ${this.subtype} frame. Symbols cannot be serialized.`)
+        }
         this._payload = payload
-        this._encoded = undefined
     }
 
-    public get encoded(): number[] {
-        // avoid reencoding if it's not necessary
-        if (typeof this._encoded !== 'undefined') {
-            return this._encoded
-        }
+    public encode(): number[] {
 
         let encRet: number[] = []
 
@@ -452,34 +384,24 @@ export abstract class OutgoingFrame extends BaseAbstract {
         }
 
         if (this.subtype === 'UI' || this.subtype === 'I' || this.subtype === 'TEST' ) { // ignore XID because it has its own separate encoding procedure
-            switch (typeof this.payload) {
-                case "string":
-                case "number":
-                case "bigint":
-                case "boolean":
-                case "function":
-                    encRet.push(...new TextEncoder().encode(String(this.payload)))
-                    break;
-                case "object":
-                    if (isPromise(this.payload)) {
-                        throw new Error(`${this.subtype} frame's payload is a promise, resolve all promises to a value before setting them as the payload.`)
-                    }
-                    else if (
-                        (Array.isArray(this.payload) && this.payload.every(item => typeof item === 'number')) ||
-                        Buffer.isBuffer(this.payload) ||
-                        this.payload instanceof Uint8Array ||
-                        this.payload instanceof Uint8ClampedArray
-                    ) {
-                        encRet.push(...this.payload)
-                    }
-                    else {
-                        encRet.push(...new TextEncoder().encode(JSON.stringify(this.payload)))
-                    }
-                    break;
-                case "undefined":
-                    break; // do nothing
-                case "symbol":
-                    throw new Error(`Invalid payload on ${this.subtype} frame. Symbols cannot be serialized.`)
+            if (typeof this.payload === 'undefined') {
+                // do nothing
+            }
+            else if (typeof this.payload === 'object') {
+                if (
+                    (Array.isArray(this.payload) && this.payload.every(item => typeof item === 'number')) ||
+                    Buffer.isBuffer(this.payload) ||
+                    this.payload instanceof Uint8Array ||
+                    this.payload instanceof Uint8ClampedArray
+                ) {
+                    encRet.push(...this.payload)
+                }
+                else {
+                    encRet.push(...new TextEncoder().encode(JSON.stringify(this.payload)))
+                }
+            }
+            else {
+                encRet.push(...new TextEncoder().encode(String(this.payload)))
             }
         }
         else if (this.subtype === 'XID') { // the xid payload is just raw numbers
@@ -506,14 +428,6 @@ export abstract class OutgoingFrame extends BaseAbstract {
         encRet.push(0xC0) // FEND flag
 
         return encRet
-    }
-
-    // convenience method
-    public send(): void {
-        if (typeof this.kissConnection === 'undefined') {
-            throw new Error('A valid KISS connection must be set to call the OutgoingFrame.send() method.')
-        }
-        this.kissConnection.write(this)
     }
 
 }

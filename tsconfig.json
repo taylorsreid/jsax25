@@ -16,7 +16,7 @@
         "rootDir": "./src",
         "strictNullChecks": true,
         "noUnusedLocals": true,
-        "types": [],
+        "types": ["node"],
         "noImplicitOverride": true,
         "strictPropertyInitialization": true,
     },

@@ -1,4 +1,3 @@
-import { KissConnection, type SerialKissConstructor, type TcpKissConstructor } from '../kissconnection';
 import { resetRepeaters, type Repeater } from "../misc";
 import { BaseAbstract, type FrameSubtype, type FrameType } from "./baseabstract";
 import { controlFieldCombinations, type ControlFieldCombination } from './controlFieldCombinations';
@@ -23,24 +22,17 @@ export class IncomingFrame extends BaseAbstract {
     protected _type: FrameType | undefined;
     protected _subtype: FrameSubtype | undefined;
     protected _pid: number | undefined;
-    protected _payload: Buffer | undefined; // TODO: buffer? number[]?
+    protected _payload: Buffer | undefined;
+
+    /**
+     * TODO:
+     */
     public readonly encoded: number[];
-    public readonly kissConnection: KissConnection | undefined;
 
-    constructor(encodedKissFrame: number[], kissConnection?: KissConnection | TcpKissConstructor | SerialKissConstructor, modulo: 8 | 128 = 8) {
+    constructor(encodedKissFrame: ArrayLike<number> | Iterable<number>, modulo: 8 | 128 = 8) {
         super()
-
-        this.encoded = encodedKissFrame
-
-        //
+        this.encoded = Array.from(encodedKissFrame)
         this.modulo = modulo
-
-        if (kissConnection instanceof KissConnection) {
-            this.kissConnection = kissConnection
-        }
-        else if (typeof kissConnection !== 'undefined') {
-            this.kissConnection = new KissConnection(kissConnection)
-        }
     }
 
     private static decodeCallsign(bytes: number[]): string {
@@ -197,7 +189,6 @@ export class IncomingFrame extends BaseAbstract {
 
     public get subtype(): FrameSubtype {
         if (typeof this._subtype === 'undefined') {
-
             const cfb: string = this.getControlFieldBits()
             if (this.type === 'unnumbered') {
                 const found: ControlFieldCombination = controlFieldCombinations.find((cc) => {
@@ -220,11 +211,11 @@ export class IncomingFrame extends BaseAbstract {
                 this._subtype = 'I'
             }
         }
-        return this._subtype! // it has to be one of the 3
+        return this._subtype // it has to be one of the 3
     }
 
     public get receivedSequence(): number | undefined {
-        if (this.type !== 'unnumbered' && typeof this._receivedSequence === 'undefined') { // received sequences only exist on the other 2 internal frame types
+        if (this.type !== 'unnumbered' && typeof this._receivedSequence === 'undefined') { // received sequences only exist on the other 2 frame types
             this._receivedSequence = (this.modulo === 8) ? parseInt(this.getControlFieldBits().slice(0, 3), 2) : parseInt(this.getControlFieldBits().slice(0, 7), 2)
         }
         return this._receivedSequence
@@ -257,22 +248,17 @@ export class IncomingFrame extends BaseAbstract {
 
     public get payload(): Buffer | undefined {
         if (typeof this._payload === 'undefined' && (this.subtype === 'UI' || this.subtype === 'I' || this.subtype === 'TEST' || this.subtype === 'XID')) {
-            // this._payload = ''
-
             // ternary accounts for the presence of a pid field
             let position: number = ((this.subtype === 'I' || this.subtype === 'UI') ? 18 : 17) + (7 * this.repeaters.length)
 
             // decode all the way until the frame end flag since kiss frames have a 0xC0 at the end of the frame
-            // this._payload = String.fromCharCode(...this.encoded.slice(position, this.encoded.lastIndexOf(0xC0)))
             this._payload = Buffer.from(this.encoded.slice(position, this.encoded.lastIndexOf(0xC0)))
         }
         return this._payload
     }
 
-    // use a getter so that it's lazy loaded
     protected get responseConstructor(): OutgoingConstructor {
         return {
-            kissConnection: this.kissConnection,
             destinationCallsign: this.sourceCallsign,
             destinationSsid: this.sourceSsid,
             destinationReservedBitOne: this.sourceReservedBitOne,
@@ -294,77 +280,74 @@ export class IncomingFrame extends BaseAbstract {
         return c
     }
 
-    // TODO: move all methods to a reply() or replyWith() method
-
-    public newREJFrame(receivedSequence: number, pollOrFinal: boolean, commandOrResponse: 'command' | 'response'): REJFrame {
-        return new REJFrame(this.sResponseConstructor(receivedSequence, pollOrFinal, commandOrResponse))
-    }
-
-    public newRNRFrame(receivedSequence: number, pollOrFinal: boolean, commandOrResponse: 'command' | 'response'): RNRFrame {
-        return new RNRFrame(this.sResponseConstructor(receivedSequence, pollOrFinal, commandOrResponse))
-    }
-
-    public newRRFrame(receivedSequence: number, pollOrFinal: boolean, commandOrResponse: 'command' | 'response'): RRFrame {
-        return new RRFrame(this.sResponseConstructor(receivedSequence, pollOrFinal, commandOrResponse))
-    }
-
-    public newSREJFrame(receivedSequence: number, pollOrFinal: boolean, commandOrResponse: 'command' | 'response'): SREJFrame {
-        // pollOrFinal is optional in SFrameConstructor but required in SREJFrameConstructor. We already set it in the sResponseConstructor method, so type cast it.
-        return new SREJFrame(this.sResponseConstructor(receivedSequence, pollOrFinal, commandOrResponse) as SREJFrameConstructor)
-    }
-
-    public newDISCFrame(): DISCFrame {
-        return new DISCFrame(this.responseConstructor)
-    }
-
-    public newDMFrame(): DMFrame {
-        return new DMFrame(this.responseConstructor)
-    }
-
-    public newSABMFrame(): SABMFrame {
-        return new SABMFrame(this.responseConstructor)
-    }
-
-    public newSABMEFrame(): SABMEFrame {
-        return new SABMEFrame(this.responseConstructor)
-    }
-
-    public newTESTFrame(payload?: any, commandOrResponse: 'command' | 'response' = 'command'): TESTFrame {
-        const c: TestFrameConstructor = structuredClone(this.responseConstructor)
-        c.payload = payload
-        c.commandOrResponse = commandOrResponse
-        return new TESTFrame(c)
-    }
-
-    public newUAFrame(): UAFrame {
-        return new UAFrame(this.responseConstructor)
-    }
-
-    public newUIFrame(payload: any, pid: number = this.pid ?? 240, pollOrFinal: boolean = false, commandOrResponse: 'command' | 'response' = 'response'): UIFrame {
-        const c: UIFrameConstructor = structuredClone(this.responseConstructor) as UIFrameConstructor
-        c.payload = payload
-        c.pid = pid
-        c.pollOrFinal = pollOrFinal
-        c.commandOrResponse = commandOrResponse
-        return new UIFrame(c)
-    }
-
-    public newXIDFrame(commandOrResponse: 'command' | 'response' = 'response', pollOrFinal: boolean = false): XIDFrame {
-        const c: XIDFrameConstructor = structuredClone(this.responseConstructor)
-        c.commandOrResponse = commandOrResponse
-        c.pollOrFinal = pollOrFinal
-        return new XIDFrame(c)
-    }
-
-    public newIFrame(payload: any, receivedSequence: number, sendSequence: number, pollOrFinal: boolean = false, pid: number = this.pid ?? 240): IFrame {
-        const c: IFrameConstructor = structuredClone(this.responseConstructor) as IFrameConstructor
-        c.modulo = this.modulo
-        c.payload = payload
-        c.receivedSequence = receivedSequence
-        c.sendSequence = sendSequence
-        c.pollOrFinal = pollOrFinal
-        c.pid = pid
-        return new IFrame(c)
+    public replyWith(frameSubtype: 'RR', receivedSequence: number, pollOrFinal?: boolean, commandOrResponse?: 'command' | 'response'): RRFrame
+    public replyWith(frameSubtype: 'RNR', receivedSequence: number, pollFinal?: boolean, commandOrResponse?: 'command' | 'response'): RNRFrame
+    public replyWith(frameSubtype: 'REJ', receivedSequence: number, pollFinal?: boolean, commandOrResponse?: 'command' | 'response'): REJFrame    
+    public replyWith(frameSubtype: 'SREJ', receivedSequence: number, pollFinal: boolean, commandOrResponse?: 'command' | 'response'): SREJFrame
+    public replyWith(frameSubtype: 'SABME'): SABMEFrame
+    public replyWith(frameSubtype: 'SABM'): SABMFrame
+    public replyWith(frameSubtype: 'DISC'): DISCFrame
+    public replyWith(frameSubtype: 'DM'): DMFrame
+    public replyWith(frameSubtype: 'UA'): UAFrame
+    public replyWith(frameSubtype: 'UI', payload: any, pid?: number, pollOrFinal?: boolean, commandOrResponse?: 'command' | 'response'): UIFrame
+    public replyWith(frameSubtype: 'XID', commandOrResponse?: 'command' | 'response', pollOrFinal?: boolean): XIDFrame
+    public replyWith(frameSubtype: 'TEST', payload?: any, commandOrResponse?: 'command' | 'response'): TESTFrame
+    public replyWith(frameSubtype: 'I', payload: any, receivedSequence: number, sendSequence: number, pollOrFinal?: boolean, pid?: number): IFrame
+    public replyWith(frameSubtype: Exclude<FrameSubtype, 'FRMR'>, param1?: any, param2?: any, param3?: any, param4?: any, param5?: any) {
+            switch (frameSubtype) {
+                case 'RR':
+                    param2 ??= false
+                    param3 ??= 'response'
+                    return new RRFrame(this.sResponseConstructor(param1, param2, param3))
+                case 'RNR':
+                    param2 ??= false
+                    param3 ??= 'response'
+                    return new RNRFrame(this.sResponseConstructor(param1, param2, param3))
+                case 'REJ':
+                    param2 ??= false
+                    param3 ??= 'response'
+                    return new REJFrame(this.sResponseConstructor(param1, param2, param3))
+                case 'SREJ':
+                    // pollOrFinal is optional in SFrameConstructor but required in SREJFrameConstructor. We already set it in the sResponseConstructor method, so type cast it.
+                    param3 ??= 'response'
+                    return new SREJFrame(this.sResponseConstructor(param1, param2, param3) as SREJFrameConstructor)
+                case 'SABME':
+                    return new SABMEFrame(this.responseConstructor)
+                case 'SABM':
+                    return new SABMFrame(this.responseConstructor)
+                case 'DISC':
+                    return new DISCFrame(this.responseConstructor)
+                case 'DM':
+                    return new DMFrame(this.responseConstructor)
+                case 'UA':
+                    return new UAFrame(this.responseConstructor)
+                case 'UI':
+                    const uic: UIFrameConstructor = structuredClone(this.responseConstructor) as UIFrameConstructor
+                    uic.payload = param1
+                    uic.pid = param2 ?? this.pid ?? 240
+                    uic.pollOrFinal = param3 ?? false
+                    uic.commandOrResponse = param4 ?? 'response'
+                    return new UIFrame(uic)
+                case 'XID':
+                    const xidc: XIDFrameConstructor = structuredClone(this.responseConstructor)
+                    xidc.commandOrResponse = param1 ?? 'command'
+                    xidc.pollOrFinal = param2 ?? false
+                    return new XIDFrame(xidc)
+                case 'TEST':
+                    const tc: TestFrameConstructor = structuredClone(this.responseConstructor)
+                    tc.payload = param1
+                    tc.commandOrResponse = param2 ?? 'command'
+                    return new TESTFrame(tc)
+                case 'I':
+                    const ic: IFrameConstructor = structuredClone(this.responseConstructor) as IFrameConstructor
+                    ic.modulo = this.modulo
+                    ic.payload = param1
+                    ic.receivedSequence = param2
+                    ic.sendSequence = param3
+                    ic.pollOrFinal = param4 ?? false
+                    ic.pid = param5 ?? this.pid ?? 240
+                    return new IFrame(ic)
+            }
     }
 
 }
