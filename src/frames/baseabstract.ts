@@ -6,14 +6,13 @@
 import util from "node:util"
 import type { Repeater } from "../misc"
 
-export type FrameType = 'information' | 'supervisory' | 'unnumbered'
 export type SFrameType = 'RR' | 'RNR' | 'REJ' | 'SREJ'
 export type UFrameType = 'SABME' | 'SABM' | 'DISC' | 'DM' | 'UA' | 'UI' | 'FRMR' | 'XID' | 'TEST'
 export type IFrameType = 'I'
 export type FrameSubtype = SFrameType | UFrameType | IFrameType
 
 export abstract class BaseAbstract {
-    public abstract type: FrameType
+    public abstract type: 'information' | 'supervisory' | 'unnumbered'
     public abstract subtype: FrameSubtype
     public abstract destinationCallsign: string
     public abstract destinationSsid: number

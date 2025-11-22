@@ -23,6 +23,7 @@ export { UIFrame, type UIFrameConstructor } from './outgoing/unnumbered/ui'
 export { XIDFrame, type XIDFrameConstructor } from './outgoing/unnumbered/xid'
 
 // misc
+export type { FrameSubtype, IFrameType, SFrameType, UFrameType } from './baseabstract'
 export { IncomingFrame } from './incoming'
 export { IFrame, type IFrameConstructor } from './outgoing/information'
 export { type OutgoingConstructor } from './outgoing/outgoing'
