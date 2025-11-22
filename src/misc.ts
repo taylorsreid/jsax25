@@ -3,45 +3,27 @@
 // The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 // THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-/** A repeater used in a sent or received packet's repeater path. */
+/** A repeater/digipeater used in a sent or received packet's repeater path. */
 export interface Repeater {
+    /** The amateur radio callsign of the repeater/digipeater. Valid callsigns are 1 to 6 characters (inclusive). */
     callsign: string,
+    /** The SSID of the repeater/digipeater. Valid SSIDs are integers 0 to 15 (inclusive). */
     ssid: number
+    /** 
+     * A bit indicating whether this repeater/digipeater has already repeated this packet. The named repeater/digipeater should flip this bit prior to repeating packets addressed to them.
+     * @default false
+     */
     hasBeenRepeated?: boolean
+    /**
+     * Reserved bit that may be used in an agreed-upon manner in individual networks.
+     * @default false
+     */
     reservedBitOne?: boolean,
+    /**
+     * Reserved bit that may be used in an agreed-upon manner in individual networks.
+     * @default false
+     */
     reservedBitTwo?: boolean,
-}
-
-export interface hasPid {
-    get pid(): number
-    set pid(pid: number)
-}
-
-export interface hasPayload {
-    get payload(): any
-    set payload(payload: any)
-}
-
-export interface hasReceivedSequence {
-    get receivedSequence(): number
-    set receivedSequence(receivedSequence: number)
-}
-
-export interface hasSendSequence {
-    get sendSequence(): number
-    set sendSequence(sendSequence: number)
-}
-
-export interface mutableCommandOrResponse {
-    set commandOrResponse(commandOrResponse: "command" | "response")
-}
-
-export interface mutablePollOrFinal {
-    set pollOrFinal(pollOrFinal: boolean)
-}
-
-export interface mutableModulo {
-    set modulo(modulo: 8 | 128)
 }
 
 export function validateCallsign(callsign: string) {
