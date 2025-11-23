@@ -6,7 +6,7 @@
 ![GitHub](https://img.shields.io/badge/Github-black?style=flat&logo=github)
 [![TypeDoc](https://img.shields.io/badge/TypeDoc-black?style=flat&logo=github-pages)](https://taylorsreid.github.io/jsax25/)
 [![npm version](https://badge.fury.io/js/jsax25.svg)](https://badge.fury.io/js/jsax25)
-![Coverage](https://img.shields.io/badge/coverage-98%25-green?style=flat&logo=jest)
+[![Coverage](https://img.shields.io/badge/coverage-98%25-green?style=flat&logo=jest)](https://github.com/taylorsreid/jsax25/blob/main/tests.test.ts)
 [![Codefactor](https://www.codefactor.io/repository/github/taylorsreid/jsax25/badge)](https://www.codefactor.io/repository/github/taylorsreid/jsax25/)
 
 ## Installation
