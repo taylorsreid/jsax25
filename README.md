@@ -1,136 +1,162 @@
-# JSAX25
 
-A Javascript connector class for amateur radio KISS connections that encodes, compresses, decompresses, and decodes KISS + AX.25 frames in conjunction with a software modem like Direwolf or UZ7HO SoundModem, or with a hardware TNC like a Mobilinkd.
+# <center>JSAX25</center>
+<center>AX.25 amateur packet radio for Node, made simple.</center>
+<br />
 
-## How to Use
+![GitHub](https://img.shields.io/badge/Github-black?style=flat&logo=github)
+[![TypeDoc](https://img.shields.io/badge/TypeDoc-black?style=flat&logo=github-pages)](https://taylorsreid.github.io/jsax25/)
+[![npm version](https://badge.fury.io/js/jsax25.svg)](https://badge.fury.io/js/jsax25)
+![Coverage](https://img.shields.io/badge/coverage-98%25-green?style=flat&logo=jest)
+[![Codefactor](https://www.codefactor.io/repository/github/taylorsreid/jsax25/badge)](https://www.codefactor.io/repository/github/taylorsreid/jsax25/)
 
-### Import the class
+## Installation
+Use your favorite JS package manager to add the package to your project:
+```bash
+npm install jsax25      # npm
 
-```js
-import { KissConnection } from 'jsax25';
+yarn add jsax25         # yarn
+
+bun add jsax25          # bun
 ```
 
-### Create a connection
+## Usage
+This library assumes that you already have some understanding of the AX.25 standard.
 
-There's a multitude of constructor options that you can use:
+The latest revision of the AX.25 standard can be found [here](https://wiki.oarc.uk/_media/packet:ax25.2.2.10.pdf).
 
-```js
-// Defaults to a TCP KISS connection at 127.0.0.1:8100
-const conn = new KissConnection()
+### Simple Example: Send a Test Frame
+```ts
+import { createConnection } from "net";
+import { IncomingFrame, TESTFrame } from "jsax25";
 
-// You can also set your own TCP options.
-const conn = new KissConnection({
-    tcpHost: '192.168.0.1'
-    tcpPort: 8080
+const test = new TESTFrame({
+    destinationCallsign: 'N0CALL',
+    destinationSsid: 10,
+    sourceCallsign: 'N0CALL',
+    sourceSsid: 7,
+    payload: 'hello world'
 })
 
-// You can also use a serial port, this will override any TCP options that you set.
-const conn = new KissConnection({
-    serialPort: 'COM1'
+createConnection({
+    host: 'localhost',
+    port: 8001
+})
+.on('data', (chunk) => console.log(new IncomingFrame(chunk)))
+.write(test.encode())
+```
+
+### Intermediate Example: Listen and Respond to UI Frames
+```ts
+import { createConnection, Socket } from "net";
+import { IncomingFrame, UIFrame } from "jsax25";
+
+const MY_CALL: string = 'N0CALL'
+const MY_SSID: number = 7
+
+// create a KISS connection to your running software modem or hardware TNC
+const kissConnection: Socket = createConnection({
+    host: 'localhost',
+    port: 8001
 })
 
-// A more complex example, a serial connection with a custom baud rate, Brotli compression enabled, and connection errors suppressed.
-// You can use different combinations together, except for serialPort, tcp, and nullModem options, you must pick one.
-const conn = new KissConnection({
+// setup an event listener
+kissConnection.on('data', (chunk) => {
+    // create an IncomingFrame object from the chunk to decode it
+    const incoming: IncomingFrame = new IncomingFrame(chunk)
 
-    serialPort: 'COM2',
-
-    serialBaud: 9600 // Default if not set is 1200.
-
-    compression: true, // Default is false, set to true to reduce bandwidth usage.
-                       // KissConnection will automatically detect if the other callsign + SSID combo is using this library,
-                       // and compress packets after exchanging initial packets.
-                       // Enabling compression does not break backwards compatibility with sources sending uncompressed data,
-                       // and packets may still be sent uncompressed if the compression effect isn't significant.
-
-    suppressConnectionErrors: true //useful if you are building a CLI app like a BBS and want to handle errors on your own without them being printed to the console.
-})
-
-// You can also initialize a dummy modem that just outputs to the console when you call the send method. This is useful for testing your application's behavior without actually sending anything over the air:
-const conn = new KissConnection({
-    nullModem: true // setting this to true overrides all serial and TCP settings
+    // do something with the data
+    console.log(incoming)
+    if (incoming.destinationCallsign === MY_CALL && incoming.destinationSsid === MY_SSID && incoming.subtype === 'UI') {
+        const reply: UIFrame = incoming.replyWith('UI', `${MY_CALL}-${MY_SSID} has received your frame. Greetings!`)
+        kissConnection.write(reply.encode())
+    }
 })
 ```
 
-### Create an encoded packet
+### Complex Example: Connect and Disconnect from a Session
+```ts
+import { DISCFrame, IncomingFrame, SABMFrame } from "jsax25";
+import { SerialPort } from "serialport"
 
-```js
-let myFrame: KissInput = {
-    sourceCallsign: 'MY0CALL',
-    sourceSsid: 0, // Default is 0 if not specified.
-    destinationCallsign: 'THEIR0CALL',
-    destinationSsid: 1, // Default is 0 if not specified.
-    payload: 'Hello world!', // Also supports automatic stringification of number, JSON / object, and array types.
-    repeaters: [ // Optional repeater path you wish to use in sending the packet, Default none aka simplex if not defined.
-        { callsign: 'RPT0CALL', ssid: 1, hasBeenRepeated: false }, // be very careful with hasBeenRepeated, as it can cause unexpected behavior when use improperly
-        { callsign: 'RPT1CALL', ssid: 2 } // leave it undefined if you're not sure
-    ],
-    frameType: 'unnumbered', // Optional and defaults to 'unnumbered' valid choices are 'information'|'supervisory'|'unnumbered'. Only unnumbered is implemented at this time.
-    pid: number // Optional, indicates which layer 3 protocol is in use, default is 240 which is none. Leave this alone unless you're very sure about it.
+const MY_CALL: string = 'N0CALL'
+const MY_SSID: number = 7
+
+const THEIR_CALL: string = 'N0CALL'
+const THEIR_SSID: number = 10
+
+async function connect(destinationCallsign: string, destinationSsid: number, sourceCallsign: string, sourceSsid: number, kissConnection: SerialPort): Promise<void> {
+    return new Promise((resolve, reject) => {
+        const sabm: SABMFrame = new SABMFrame({ destinationCallsign, destinationSsid, sourceCallsign, sourceSsid }) // create an SABM or SABME frame
+
+        const handleConnection = (data: Buffer) => { // create a handler function for the on('data') event
+            const response: IncomingFrame = new IncomingFrame(data)
+            if (response.destinationCallsign === MY_CALL && response.destinationSsid === MY_SSID) { // if it's addressed to us
+                if (response.subtype === 'UA') { // success
+                    resolve()
+                }
+                else if (response.subtype === 'DM') { // failure
+                    reject(new Error('The remote station is not ready for connection.'))
+                }
+                else { // unknown response
+                    reject(new Error(`The remote station responded with a ${response.subtype} frame. Expected a UA or DM frame.`))
+                }
+                kissConnection.removeListener('data', handleConnection) // don't forget to remove the handler
+            }
+        }
+        kissConnection.on('data', handleConnection) // set the handler
+        kissConnection.write(sabm.encode()) // send the frame
+    })
 }
-```
 
-### Send a packet
+async function disconnect(destinationCallsign: string, destinationSsid: number, sourceCallsign: string, sourceSsid: number, kissConnection: SerialPort, retries: number = 3): Promise<void> {
+    return new Promise((resolve, reject) => {
+        // keep track of how many attempts to disconnect have been made
+        let attempts: number = 0
 
-```js
-conn.send(myFrame); // encodes and sends packet immediately, if nullModem is set to true then just outputs to the console without sending
-conn.send([myFrame, myFrame]); // also accepts an array of unencoded packets, encodes them and sends them upon finishing encoding all of them.
-```
+        // create a disconnect frame and encode it
+        const disc: Uint8Array = new DISCFrame({ destinationCallsign, destinationSsid, sourceCallsign, sourceSsid }).encode()
 
-### Manual encoding and sending of packets (optional, not reccomended)
-
-```js
-const encodedFrame: EncodedKissFrame = conn.encode(myFrame) // not necessary but if for some reason you wish to manually encode and manage your frames, you can do this
-const manualConn = conn.getConnection() // returns the SerialPort or TCP Socket instance
-manualConn.write(new Uint8Array(encodedFrame))
-```
-
-### Listening for data
-
-```js
-conn.on('data', (decodedFrame:KissOutput) => {
-    console.log(decodedFrame)
-    // or do some other stuff
-})
-
-// decoded data looks like this:
-{
-    destinationCallsign: string, // The destination amateur radio callsign.
-
-    destinationSsid: number, // The destination's SSID. Default 0 if not defined.
-
-    destinationCommand: boolean, // command = true = 1, response = false = 0, inverted from sourceCommand. Whether the frame is a command frame from the destination or
-                                 // not. Must be opposite of sourceCommand.
-
-    sourceCallsign: string, // The sender's amateur radio callsign.
-
-    sourceSsid: number, // The sender's SSID. Default 0 if not defined.
-
-    sourceCommand: boolean // command = true = 0, response = false = 1. inverted from destinationCommand. Whether the frame is a command frame from the source or
-                           // not. Must be opposite of destinationCommand.
-
-    sourceAcceptsCompression: boolean, // If the sender is using this library, indicates whether they have compression enabled using the Brotli algorithm.
-
-    payloadIsCompressed: boolean, // If the sender is using this library, indicates whether the payload is compressed or not.
-                                  // The payload is not always compressed even if compression is enabled,
-                                  // for instance if the compressed version is longer than the uncompressed version.
-
-    payload: Serializable, // The payload/body of the packet frame. Can be of multiple different types just like in the input,
-                           // see exported Serializable interface for exact allowed types.
-
-    repeaters: Repeater[], // The repeater path that the packet was received on. Empty if no repeaters used.
-
-    frameType: 'information'|'supervisory'|'unnumbered', // Which of the allowed frame types the frame is, unnumbered is the most common in APRS and is the default.
-
-    pid: number // The PID indicates which layer 3 protocol is in use, default is 240 which is none.
+        // create a handler function for the on('data') event
+        const checkUA = async (data: Buffer) => {
+            const response: IncomingFrame = new IncomingFrame(data)
+            if (response.destinationCallsign === MY_CALL && response.destinationSsid === MY_SSID) { // if it's addressed to us
+                if (response.subtype === 'UA') { // success
+                    resolve()
+                    kissConnection.removeListener('data', checkUA) // don't forget to remove the handler
+                }
+                else { // maybe failure
+                    if (attempts <= retries) { // try again if we haven't reached our retry limit
+                        kissConnection.write(disc)
+                    }
+                    else { // otherwise failure
+                        reject(new Error(`Unable to disconnect properly from ${destinationCallsign}-${destinationSsid}`))
+                        kissConnection.removeListener('data', checkUA) // don't forget to remove the handler
+                    }
+                }
+            }
+        }
+        kissConnection.on('data', checkUA) // set the handler
+        kissConnection.write(disc) // send the frame
+        attempts++ // increment the amount of times we've attempted to disconnect
+    })
 }
-```
 
-### Manual listening and decoding of data (optional, not reccomended)
-
-```js
-conn.on('raw', (data:EncodedKissFrame) => {
-    const decoded:KissOutput = conn.decode(data)
-    // or do other stuff like store them
+const kissConnection: SerialPort = new SerialPort({
+    path: '/dev/rfcomm0',
+    baudRate: 9600
 })
+kissConnection.on('data', (chunk) => console.log(new IncomingFrame(chunk)))
+
+try {
+    await connect(THEIR_CALL, THEIR_SSID, MY_CALL, MY_SSID, kissConnection)
+    console.log(`Connected to ${THEIR_CALL}-${THEIR_SSID}`)
+    // continue with your program here...
+    // All link state management must be done manually (I frames, retries, incrementing receievedSequence/sendSequence, acknowledgement, etc.). A future version of JSAX25 may automate this.
+    await disconnect(THEIR_CALL, THEIR_SSID, MY_CALL, MY_SSID, kissConnection)
+    console.log(`Disconnected from ${THEIR_CALL}-${THEIR_SSID}`)
+}
+catch (error) {
+    console.log(error)
+    kissConnection.destroy()
+}
 ```

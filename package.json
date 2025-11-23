@@ -6,7 +6,7 @@
     "type": "git",
     "url": "git+https://github.com/taylorsreid/jsax25.git"
   },
-  "main": "./dist/index.js",
+  "main": "dist/index.js",
   "devDependencies": {
     "@jest/globals": "^30.2.0",
     "@types/bun": "^1.3.1",
@@ -37,11 +37,13 @@
     "radio",
     "hamradio"
   ],
-  "license": "GPL-3.0-only",
+  "license": "MIT",
   "scripts": {
     "build": "tsc",
     "test": "jest",
-    "typedoc": "typedoc src/index.ts --exclude \"scratch.ts\" --html docs"
+    "typedoc": "typedoc src/index.ts --exclude \"scratch.ts tests.test.ts\" --html docs",
+    "prepublishOnly": "tsc",
+    "postpublish": "rm -r dist"
   },
   "type": "module",
   "types": "./dist/types.d.ts"

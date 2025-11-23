@@ -3,10 +3,11 @@
 // The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 // THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+import type { SFrameType } from "../baseabstract";
 import { OutgoingAbstract, type OutgoingConstructor } from "./outgoingabstract";
 
-/** Information Frame Constructor */
-export interface IFrameConstructor extends OutgoingConstructor {
+/** Supervisory Frame Constructor */
+export interface SFrameConstructor extends OutgoingConstructor {
     /**
      * Determines the number of outstanding information frames allowed per layer 2 connection at one time.
      * 
@@ -32,36 +33,15 @@ export interface IFrameConstructor extends OutgoingConstructor {
     pollOrFinal?: boolean
 
     /**
-     * Found in the control field of all information frames. Otherwise undefined. It contains the sequence number of the information frame being sent.
-     * Just prior to the transmission of the information frame, it is updated to equal the send state variable.
-     * 
-     * Valid values are integers 0 to 7 inclusive when using modulo 8, or integers 0 to 127 inclusive when using modulo 127.
+     * Whether the frame is a command frame or a response frame.
+     * @default 'response'
      */
-    sendSequence: number
-
-    /**
-     * A number indicating which layer 3 protocol is in use according to the AX25 spec. Found on information (I) and unnumbered information (UI) frames. Otherwise undefined.
-     * 
-     * Valid values are integers 0 to 255 inclusive.
-     * 
-     * @default 240
-     */
-    pid?: number
-
-    /**
-     * The data or "body" being carried by the frame.
-     * 
-     * Non-objects are stringified then encoded using TextEncoder. Objects are first run though JSON.stringify(), then encoded using TextEncoder.
-     * Exceptions are Uint8Array and Uint8ClampedArray objects, which are pushed directly to the payload without transformation. Use this format to transmit raw binary data.
-     */
-    payload: any
+    commandOrResponse?: 'command' | 'response'
 }
 
-/** Information Frame */
-export class IFrame extends OutgoingAbstract {
-
-    constructor(args: IFrameConstructor) {
-        super(args, 'I')
+export abstract class SupervisoryAbstract extends OutgoingAbstract {
+    constructor(args: SFrameConstructor, frameSubtype: SFrameType) {
+        super(args, frameSubtype)
     }
 
     public override get pollOrFinal(): boolean {
@@ -71,13 +51,6 @@ export class IFrame extends OutgoingAbstract {
         super.pollOrFinal = pollOrFinal
     }
 
-    public override get modulo(): 8 | 128 {
-        return super.modulo
-    }
-    public override set modulo(modulo: 8 | 128) {
-        super.modulo = modulo
-    }
-
     public override get receivedSequence(): number {
         return super.receivedSequence!
     }
@@ -85,25 +58,51 @@ export class IFrame extends OutgoingAbstract {
         super.receivedSequence = receivedSequence
     }
 
-    public override get sendSequence(): number {
-        return super.sendSequence!
+    public override get modulo(): 8 | 128 {
+        return super.modulo
     }
-    public override set sendSequence(sendSequence: number) {
-        super.sendSequence = sendSequence
-    }
-
-    public override get pid(): number {
-        return super.pid!
-    }
-    public override set pid(pid: number) {
-        super.pid = pid
+    public override set modulo(modulo: 8 | 128) {
+        super.modulo = modulo
     }
 
-    public override get payload(): any {
-        return super.payload
+    public override get commandOrResponse(): "command" | "response" {
+        return super.commandOrResponse
     }
-    public override set payload(payload: any) {
-        super.payload = payload
+    public override set commandOrResponse(commandOrResponse: "command" | "response") {
+        super.commandOrResponse = commandOrResponse
     }
+}
 
+/** Reject Frame */
+export class REJFrame extends SupervisoryAbstract {
+    constructor(args: SFrameConstructor) {
+        super(args, 'REJ')
+    }
+}
+
+/** Receive Not Ready Frame */
+export class RNRFrame extends SupervisoryAbstract {
+    constructor(args: SFrameConstructor) {
+        super(args, 'RNR')
+    }
+}
+
+/** Receive Ready Frame */
+export class RRFrame extends SupervisoryAbstract {
+    constructor(args: SFrameConstructor) {
+        super(args, 'RR')
+    }
+}
+
+/** Selective Reject Frame Constructor */
+export interface SREJFrameConstructor extends SFrameConstructor {
+    /** In an SREJ frame, this indicates whether to acknowledge previous frames up to receivedSequence - 1, inclusive. */
+    pollOrFinal: boolean
+}
+
+/** Selective Reject Frame */
+export class SREJFrame extends SupervisoryAbstract {
+    constructor(args: SREJFrameConstructor) {
+        super(args, 'SREJ')
+    }
 }

@@ -5,7 +5,7 @@
 
 import type { IFrameType, SFrameType, UFrameType } from "./baseabstract";
 
-export interface ControlFieldCombination {
+interface ControlFieldCombination {
     frameType: 'information' | 'supervisory' | 'unnumbered',
     frameSubtype: UFrameType | SFrameType | IFrameType,
     binaryOne?: string,

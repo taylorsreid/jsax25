@@ -4,22 +4,22 @@
 // THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 import { describe, expect, test } from '@jest/globals'
-import { DISCFrame, DMFrame, IFrame, IncomingFrame, REJFrame, Repeater, RNRFrame, RRFrame, SABMEFrame, SABMFrame, SFrameConstructor, SREJFrame, TESTFrame, UAFrame, UIFrame, UIFrameConstructor, XIDFrame } from './src'
-import { BaseAbstract, FrameSubtype, FrameType } from './src/frames/baseabstract'
-import { OutgoingConstructor, OutgoingFrame } from './src/frames/outgoing/outgoing'
-import { SupervisoryAbstract } from './src/frames/outgoing/supervisory/supervisoryabstract'
-import { validatePid } from './src/misc'
+import { DISCFrame, DMFrame, IFrame, IFrameConstructor, IncomingFrame, OutgoingConstructor, REJFrame, Repeater, RNRFrame, RRFrame, SABMEFrame, SABMFrame, SFrameConstructor, SREJFrame, TESTFrame, UAFrame, UIFrame, UIFrameConstructor, XIDFrame } from './src'
+import { BaseAbstract, FrameSubtype } from './src/frames/baseabstract'
+import { OutgoingAbstract } from './src/frames/outgoing/outgoingabstract'
+import { SupervisoryAbstract } from './src/frames/outgoing/supervisory'
+import { validateCallsign, validatePid, validateSsid } from './src/misc'
 
-// 
-const destinationCallsign: string = 'WH6CMO'
+// the remote station's callsign to use in tests
+const destinationCallsign: string = 'N0CALL'
 
-// 
+// the remote station's SSID to use in tests
 const destinationSsid: number = 10
 
-// 
-const sourceCallsign: string = 'KO4LCM'
+// your station's callsign to use in tests
+const sourceCallsign: string = 'NOCALL'
 
-// 
+// your station's SSID to use in tests
 const sourceSsid: number = 7
 
 //////////////////////////////////////////////////////////////////////////////////
@@ -31,7 +31,7 @@ describe('frames', () => {
     const uiFrameConstructor: UIFrameConstructor = structuredClone(outgoingConstructor) as UIFrameConstructor
     uiFrameConstructor.payload = 'hello world'
 
-    const table: Array<[OutgoingFrame, FrameType, FrameSubtype, 'command' | 'response', 8 | 128]> = [
+    const table: Array<[OutgoingAbstract, 'information' | 'supervisory' | 'unnumbered', FrameSubtype, 'command' | 'response', 8 | 128]> = [
         [new REJFrame(sFrameConstructor), 'supervisory', 'REJ', 'response', 8],
         [new RNRFrame(sFrameConstructor), 'supervisory', 'RNR', 'response', 8],
         [new RRFrame(sFrameConstructor), 'supervisory', 'RR', 'response', 8],
@@ -170,7 +170,97 @@ describe('frames', () => {
             expect(incoming.pollOrFinal).toBeDefined()
         })
     })
-    describe(OutgoingFrame, () => {
+    describe(OutgoingAbstract, () => {
+        const repeaters: Repeater[] = [
+            {
+                callsign: 'N0CALL',
+                ssid: 0,
+                hasBeenRepeated: false
+            }
+        ]
+        const iFrameConstructor: IFrameConstructor = { destinationCallsign, destinationSsid, sourceCallsign, sourceSsid, receivedSequence: 0, sendSequence: 0, payload: 'hello world', repeaters }
+        test('.repeaters', () => { // Jest doesn't always initialize the .repeaters array on time in the describe.each above, causing it to fail. moved to a one off test
+            const outgoing: IFrame = new IFrame(iFrameConstructor)
+            expect(outgoing.repeaters).toEqual(repeaters)
+            expect(new IncomingFrame(outgoing.encode()).repeaters).toEqual(repeaters)
+            expect(() => {
+                outgoing.repeaters = [
+                    {
+                        callsign: '',
+                        ssid: 0
+                    }
+                ]
+            }).toThrow()
+            expect(() => {
+                outgoing.repeaters = [
+                    {
+                        callsign: '1234567',
+                        ssid: 0
+                    }
+                ]
+            }).toThrow()
+            expect(() => {
+                outgoing.repeaters = [
+                    {
+                        callsign: 'N0CALL',
+                        ssid: -1
+                    }
+                ]
+            }).toThrow()
+            expect(() => {
+                outgoing.repeaters = [
+                    {
+                        callsign: 'N0CALL',
+                        ssid: 16
+                    }
+                ]
+            }).toThrow()
+        })
+        describe('encodes valid payloads', () => {
+            const outgoing = new IFrame(iFrameConstructor)
+            test('string', () => {
+                outgoing.payload = 'hello world'
+                expect(new IncomingFrame(outgoing.encode()).payload?.toString()).toBe('hello world')
+            })
+            test('number', () => {
+                outgoing.payload = 42
+                expect(new IncomingFrame(outgoing.encode()).payload?.toString()).toBe('42')
+            })
+            test('bigint', () => {
+                outgoing.payload = 21n
+                expect(new IncomingFrame(outgoing.encode()).payload?.toString()).toBe('21')
+            })
+            test('boolean', () => {
+                outgoing.payload = false
+                expect(new IncomingFrame(outgoing.encode()).payload?.toString()).toBe('false')
+                outgoing.payload = true
+                expect(new IncomingFrame(outgoing.encode()).payload?.toString()).toBe('true')
+            })
+            test('function', () => {
+                const myFunc = () => {
+                    return 'hello world'
+                }
+                outgoing.payload = myFunc
+                expect(new IncomingFrame(outgoing.encode()).payload?.toString()).toBe(myFunc.toString())
+            })
+            test('object', () => {
+                const myObj = {
+                    first: 'Taylor',
+                    last: 'Reid',
+                    age: 32
+                }
+                outgoing.payload = myObj
+                expect(new IncomingFrame(outgoing.encode()).payload?.toString()).toBe(JSON.stringify(myObj))
+            })
+            test('array', () => {
+                outgoing.payload = [42, 21]
+                expect(new IncomingFrame(outgoing.encode()).payload?.toString()).toBe('[42,21]') // stringifying removes whitespace
+            })
+        })
+        test('throws on invalid payload', () => {
+            expect(() => new IFrame(iFrameConstructor).payload = Promise.resolve(42)).toThrow()
+            expect(() => new IFrame(iFrameConstructor).payload = Symbol.for('foo')).toThrow()
+        })
         describe(SupervisoryAbstract, () => {
             test('.modulo is mutable', () => {
                 const frame = new RRFrame(sFrameConstructor)
@@ -190,14 +280,7 @@ describe('frames', () => {
             })
         })
         describe(IFrame, () => {
-            const repeaters: Repeater[] = [
-                {
-                    callsign: 'N0CALL',
-                    ssid: 0,
-                    hasBeenRepeated: false
-                }
-            ]
-            const outgoing = new IFrame({ destinationCallsign, destinationSsid, sourceCallsign, sourceSsid, receivedSequence: 0, sendSequence: 0, payload: 'hello world', repeaters })
+            const outgoing = new IFrame(iFrameConstructor)
             test('.modulo is mutable', () => {
                 expect(outgoing.modulo).toBe(8)
                 outgoing.modulo = 128
@@ -221,60 +304,6 @@ describe('frames', () => {
                 expect(() => outgoing.sendSequence = 8).not.toThrow()
                 expect(() => outgoing.sendSequence = 128).toThrow()
                 outgoing.modulo = 8
-            })
-            test('.repeaters', () => { // Jest doesn't always initialize the .repeaters array in the describe.each above, causing it to fail. moved to a one off test
-                const incoming: IncomingFrame = new IncomingFrame(outgoing.encode())
-                expect(outgoing.repeaters).toEqual(repeaters)
-                expect(() => {
-                    outgoing.repeaters = [
-                        {
-                            callsign: '',
-                            ssid: 0
-                        }
-                    ]
-                }).toThrow()
-                expect(() => {
-                    outgoing.repeaters = [
-                        {
-                            callsign: '1234567',
-                            ssid: 0
-                        }
-                    ]
-                }).toThrow()
-                expect(() => {
-                    outgoing.repeaters = [
-                        {
-                            callsign: 'N0CALL',
-                            ssid: -1
-                        }
-                    ]
-                }).toThrow()
-                expect(() => {
-                    outgoing.repeaters = [
-                        {
-                            callsign: 'N0CALL',
-                            ssid: 16
-                        }
-                    ]
-                }).toThrow()
-                expect(incoming.repeaters).toEqual(repeaters)
-            })
-            test('encodes object payloads', () => {
-                outgoing.payload = Buffer.from('hello world')
-                let incoming = new IncomingFrame(outgoing.encode())
-                expect(incoming.payload?.toString()).toBe('hello world')
-                const myObj = {
-                    first: 'Taylor',
-                    last: 'Reid',
-                    age: 32
-                }
-                outgoing.payload = myObj
-                incoming = new IncomingFrame(outgoing.encode())
-                expect(incoming.payload?.toString()).toBe(JSON.stringify(myObj))
-            })
-            test('throws on invalid payload', () => {
-                expect(() => outgoing.payload = Promise.resolve(42)).toThrow()
-                expect(() => outgoing.payload = Symbol.for('foo')).toThrow()
             })
         })
     })
@@ -311,7 +340,7 @@ describe('frames', () => {
         test('.type', () => expect(incoming.type).toBe('unnumbered'))
         test('.subtype', () => expect(incoming.subtype).toBe('UI'))
         test('.receivedSequence', () => expect(incoming.receivedSequence).toBeUndefined())
-        test('.pollOrFinal',() => expect(incoming.pollOrFinal).toBe(false))
+        test('.pollOrFinal', () => expect(incoming.pollOrFinal).toBe(false))
         test('.sendSequence', () => expect(incoming.sendSequence).toBeUndefined())
         test('.pid', () => expect(incoming.pid).toBe(240))
         test('.payload', () => expect(incoming.payload?.toString()).toBe('!2135.50NT15806.44W& Haleiwa / North Shore Oahu Hawaii USA'))
@@ -329,13 +358,24 @@ describe('frames', () => {
             expect(incoming.replyWith('XID')).toBeInstanceOf(XIDFrame)
             expect(incoming.replyWith('TEST')).toBeInstanceOf(TESTFrame)
             expect(incoming.replyWith('I', 'hello world', 0, 0)).toBeInstanceOf(IFrame)
-            
+
         })
     })
 })
 
 describe('misc', () => {
+    test(validateCallsign, () => {
+        expect(() => validateCallsign('')).toThrow()
+        expect(() => validateCallsign('abcdefg')).toThrow()
+        expect(() => validateCallsign('  ')).toThrow()
+    })
+    test(validateSsid, () => {
+        expect(() => validateSsid(2.1)).toThrow()
+        expect(() => validateSsid(-1)).toThrow()
+        expect(() => validateSsid(16)).toThrow()
+    })
     test(validatePid, () => {
+        expect(() => validatePid(2.1)).toThrow()
         expect(() => validatePid(-1)).toThrow()
         expect(() => validatePid(256)).toThrow()
     })

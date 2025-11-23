@@ -7,18 +7,22 @@
 export interface Repeater {
     /** The amateur radio callsign of the repeater/digipeater. Valid callsigns are 1 to 6 characters (inclusive). */
     callsign: string,
+
     /** The SSID of the repeater/digipeater. Valid SSIDs are integers 0 to 15 (inclusive). */
     ssid: number
+
     /** 
      * A bit indicating whether this repeater/digipeater has already repeated this packet. The named repeater/digipeater should flip this bit prior to repeating packets addressed to them.
      * @default false
      */
     hasBeenRepeated?: boolean
+
     /**
      * Reserved bit that may be used in an agreed-upon manner in individual networks.
      * @default false
      */
     reservedBitOne?: boolean,
+
     /**
      * Reserved bit that may be used in an agreed-upon manner in individual networks.
      * @default false
@@ -28,19 +32,22 @@ export interface Repeater {
 
 export function validateCallsign(callsign: string) {
     if (callsign.length < 1 || callsign.length > 6 || (callsign !== callsign.toUpperCase().trim())) {
-        throw new Error(`'${callsign}' is not a valid callsign. Callsigns must have a length from 1 to 6 characters inclusive, be in all capitals, and contain no whitespace.`)
+        class InvalidCallsignError extends Error {}
+        throw new InvalidCallsignError(`'${callsign}' is not a valid callsign. Callsigns must have a length from 1 to 6 characters inclusive and be in all capitals.`)
     }
 }
 
 export function validateSsid(ssid: number) {
-    if (ssid < 0 || ssid > 15) {
-        throw new Error(`${ssid} is not a valid SSID. SSIDs must be between 0 and 15 inclusive.`)
+    if (!Number.isInteger(ssid) || ssid < 0 || ssid > 15) {
+        class InvalidSsidError extends Error {}
+        throw new InvalidSsidError(`${ssid} is not a valid SSID. SSIDs must be integers between 0 and 15 inclusive.`)
     }
 }
 
 export function validatePid(pid: number) {
-    if (pid < 0 || pid > 255) {
-        throw new Error(`${pid} is not a valid PID. PIDs must be greater than or equal to 0 and less than or equal to 255.`)
+    if (!Number.isInteger(pid) || pid < 0 || pid > 255) {
+        class InvalidPidError extends Error {}
+        throw new InvalidPidError(`${pid} is not a valid PID. PIDs must be integers between 0 and 255 inclusive.`)
     }
 }
 

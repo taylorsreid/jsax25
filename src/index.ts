@@ -3,6 +3,18 @@
 // The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 // THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-// this file is only for managing exports
-export * from './frames/index'
+// this file is for managing the myriad of exports from this directory
+
+// supervisory
+export { REJFrame, RNRFrame, RRFrame, SREJFrame, type SFrameConstructor, type SREJFrameConstructor } from './frames/outgoing/supervisory'
+
+// unnumbered
+export { DISCFrame, DMFrame, SABMEFrame, SABMFrame, TESTFrame, UAFrame, UIFrame, XIDFrame, type TESTFrameConstructor, type UIFrameConstructor, type XIDFrameConstructor } from './frames/outgoing/unnumbered'
+
+// misc
+export type { FrameSubtype, IFrameType, SFrameType, UFrameType } from './frames/baseabstract'
+export { IncomingFrame } from './frames/incoming'
+export { IFrame, type IFrameConstructor } from './frames/outgoing/information'
+export { type OutgoingConstructor } from './frames/outgoing/outgoingabstract'
 export type { Repeater } from "./misc"
+

@@ -5,40 +5,62 @@
 
 import { isPromise } from "util/types";
 import { validateCallsign, validatePid, validateSsid, type Repeater } from "../../misc";
-import { BaseAbstract, type FrameSubtype, type FrameType } from "../baseabstract";
+import { BaseAbstract, type FrameSubtype } from "../baseabstract";
 import { controlFieldCombinations } from "../controlFieldCombinations";
 import type { IFrameConstructor } from './information';
-import type { SREJFrameConstructor } from './supervisory/srej';
-import type { SFrameConstructor } from './supervisory/supervisoryabstract';
-import type { TestFrameConstructor } from './unnumbered/test';
-import type { UIFrameConstructor } from './unnumbered/ui';
-import type { XIDFrameConstructor } from './unnumbered/xid';
+import type { SFrameConstructor, SREJFrameConstructor } from './supervisory';
+import type { TESTFrameConstructor, UIFrameConstructor, XIDFrameConstructor } from './unnumbered';
 
+/** The base constructor used for all types of frames. */
 export interface OutgoingConstructor {
-    /** The amateur radio callsign of the remote station. */
+    /** The destination station's amateur radio callsign. Valid callsigns are 1 to 6 characters (inclusive), all uppercase. */
     destinationCallsign: string
-    /** The SSID of the remote station, default is 0. */
+
+    /** The destination station's SSID. Valid SSIDs are integers 0 to 15 (inclusive). */
     destinationSsid: number
-    /** The first reserved bit on the destination field. */
+
+    /**
+     * Reserved bit that may be used in an agreed-upon manner in individual networks.
+     * @default false
+     */
     destinationReservedBitOne?: boolean
-    /** The second reserved bit on the destination field. */
+
+    /**
+     * Reserved bit that may be used in an agreed-upon manner in individual networks.
+     * @default false
+     */
     destinationReservedBitTwo?: boolean
-    /** The amateur radio callsign of your station. */
+
+    /** The sending station's amateur radio callsign. Valid callsigns are 1 to 6 characters (inclusive), all uppercase. */
     sourceCallsign: string
-    /** The SSID of your station, default is 0. */
+
+    /** The sending station's SSID. Valid SSIDs are integers 0 to 15 (inclusive). */
     sourceSsid: number
-    /** The first reserved bit of the source field. */
+
+    /**
+     * Reserved bit that may be used in an agreed-upon manner in individual networks.
+     * @default false
+     */
     sourceReservedBitOne?: boolean
-    /** The second reserved bit of the source field. */
+
+    /**
+     * Reserved bit that may be used in an agreed-upon manner in individual networks.
+     * @default false
+     */
     sourceReservedBitTwo?: boolean
-    /** The repeater path that you wish your packet to take, defaults to an empty array. */
+
+    /**
+     * The repeaters/digipeaters that the frame is addressed to travel through.
+     * @see {@link Repeater Repeater}
+     * @default []
+     */
     repeaters?: Repeater[],
 }
 
-export abstract class OutgoingFrame extends BaseAbstract {
+export abstract class OutgoingAbstract extends BaseAbstract {
     // all ! properties are set via setters and/or the controlFieldCombinations search
     public readonly subtype: FrameSubtype
-    public readonly type: FrameType
+    public readonly type: 'information' | 'supervisory' | 'unnumbered'
     private _destinationCallsign!: string
     private _destinationSsid!: number
     private _destinationCommandBit!: boolean;  // set by commandOrResponse setter and/or the controlFieldCombinations search
@@ -59,8 +81,7 @@ export abstract class OutgoingFrame extends BaseAbstract {
     private _pid: number | undefined;
     private _payload: any
 
-    constructor(args: OutgoingConstructor | IFrameConstructor | SFrameConstructor | SREJFrameConstructor | TestFrameConstructor | UIFrameConstructor | XIDFrameConstructor, frameSubtype: FrameSubtype) {
-
+    constructor(args: OutgoingConstructor | IFrameConstructor | SFrameConstructor | SREJFrameConstructor | TESTFrameConstructor | UIFrameConstructor | XIDFrameConstructor, frameSubtype: FrameSubtype) {
         super()
         
         this._modulo = ('modulo' in args && typeof args.modulo !== 'undefined') ? args.modulo : 8
@@ -98,7 +119,6 @@ export abstract class OutgoingFrame extends BaseAbstract {
     }
 
     protected static encodeAddressField(callsign: string, commandOrHasBeenRepeated: boolean, reservedBitOne: boolean, reservedBitTwo: boolean, ssid: number, finalAddress: boolean): number[] {
-
         // no need to do preflight checks in this protected method, already done via the setters
         callsign = callsign.padEnd(6)
 
@@ -124,9 +144,7 @@ export abstract class OutgoingFrame extends BaseAbstract {
     }
 
     protected static encodeControlField(modulo: 8 | 128, bitsOne: string | number, pollFinal: boolean, bitsTwo: string | number): number | number[] {
-
         // no need to do preflight checks in this protected method, these values are internally calculated
-
         // if a number is passed in, convert it to a binary string and pad it with 0s to a length of 3
         if (typeof bitsOne === 'number') {
             bitsOne = bitsOne.toString(2)
@@ -223,12 +241,15 @@ export abstract class OutgoingFrame extends BaseAbstract {
             this.sourceCommandBit = true
         }
     }
+
     public get isCommand(): boolean {
         return this.commandOrResponse === 'command'
     }
+
     public get isResponse(): boolean {
         return this.commandOrResponse === 'response'
     }
+
     public get isLegacy(): boolean {
         return false
     }
@@ -236,7 +257,6 @@ export abstract class OutgoingFrame extends BaseAbstract {
     public get repeaters(): Repeater[] {
         return this._repeaters
     }
-    /** The repeater path you wish to use in sending the packet, or the path that the packet was received on. Default none if not defined. */
     public set repeaters(repeaters: Repeater[]) {
         // decided not to truncate since some people are still doing more than 2 repeaters hops even though it's against AX.25 spec, plus it's a stupid rule
         // uppercase everything
@@ -270,13 +290,13 @@ export abstract class OutgoingFrame extends BaseAbstract {
     protected set receivedSequence(receivedSequence: number | undefined) {
         if (typeof receivedSequence !== 'undefined') {
             if (!Number.isInteger(receivedSequence)) {
-                throw new Error(`Received sequence ${receivedSequence} must be an integer.`)
+                throw new RangeError(`Received sequence ${receivedSequence} must be an integer.`)
             }
             if (this.modulo === 8 && (receivedSequence < 0 || receivedSequence > 7)) {
-                throw new Error(`Received sequence ${receivedSequence} must be between 0 and 7 inclusive when set to modulo 8.`)
+                throw new RangeError(`Received sequence ${receivedSequence} must be between 0 and 7 inclusive when set to modulo 8.`)
             }
             else if (this.modulo === 128 && (receivedSequence < 0 || receivedSequence > 127)) {
-                throw new Error(`Received sequence ${receivedSequence} must be between 0 and 127 inclusive when set to modulo 128.`)
+                throw new RangeError(`Received sequence ${receivedSequence} must be between 0 and 127 inclusive when set to modulo 128.`)
             }
         }
         this._receivedSequence = receivedSequence
@@ -295,13 +315,13 @@ export abstract class OutgoingFrame extends BaseAbstract {
     protected set sendSequence(sendSequence: number | undefined) {
         if (typeof sendSequence !== 'undefined') {
             if (!Number.isInteger(sendSequence)) {
-                throw new Error(`Send sequence ${sendSequence} must be an integer.`)
+                throw new RangeError(`Send sequence ${sendSequence} must be an integer.`)
             }
             if (this.modulo === 8 && (sendSequence < 0 || sendSequence > 7)) {
-                throw new Error(`Send sequence ${sendSequence} must be between 0 and 7 inclusive when set to modulo 8.`)
+                throw new RangeError(`Send sequence ${sendSequence} must be between 0 and 7 inclusive when set to modulo 8.`)
             }
             else if (this.modulo === 128 && (sendSequence < 0 || sendSequence > 127)) {
-                throw new Error(`Send sequence ${sendSequence} must be between 0 and 127 inclusive when set to modulo 128.`)
+                throw new RangeError(`Send sequence ${sendSequence} must be between 0 and 127 inclusive when set to modulo 128.`)
             }
         }
         this._sendSequence = sendSequence
@@ -317,26 +337,37 @@ export abstract class OutgoingFrame extends BaseAbstract {
         this._pid = pid
     }
 
+    /**
+     * The data or "body" being carried by the frame.
+     * 
+     * Non-objects are stringified then encoded using TextEncoder. Objects are first run though JSON.stringify(), then encoded using TextEncoder.
+     * Exceptions are Uint8Array and Uint8ClampedArray objects, which are pushed directly to the payload without transformation. Use this format to transmit raw binary data.
+     * 
+     * @throws TypeError if attempting to set a symbol or a Promise as a payload. Symbols are not serializable and promises should be resolved to a value before setting them as the payload.
+     */
     protected get payload(): any { // only exists on information, UI, XID, and TEST frames
         return this._payload
     }
-    /** Set the payload/body of your packet frame. */
     protected set payload(payload: any) { // not mutable on XID frames
         if (isPromise(payload)) {
-            throw new Error(`${this.subtype} frame's payload is a promise, resolve all promises to a value before setting them as the payload.`)
+            throw new TypeError(`${this.subtype} frame's payload is a promise, resolve all promises to a value before setting them as the payload.`)
         }
         else if (typeof payload === 'symbol') {
-            throw new Error(`Invalid payload on ${this.subtype} frame. Symbols cannot be serialized.`)
+            throw new TypeError(`Invalid payload on ${this.subtype} frame. Symbols cannot be serialized.`)
         }
         this._payload = payload
     }
 
-    public encode(): number[] {
+    /**
+     * Get the frame encoded for use with a KISS connection. This can be written to a Socket, SerialPort, etc.
+     * @returns a Uint8Array suitable for passing to Duplex.write().
+     */
+    public encode(): Uint8Array {
 
         let encRet: number[] = []
 
         // encode and push destination address field
-        encRet.push(...OutgoingFrame.encodeAddressField(
+        encRet.push(...OutgoingAbstract.encodeAddressField(
             this.destinationCallsign, // already uppercased via this.setDestinationCallsign() and gets padded in OutgoingFrame.encodeAddressField
             this.destinationCommandBit,
             this.destinationReservedBitOne, // currently unused
@@ -346,7 +377,7 @@ export abstract class OutgoingFrame extends BaseAbstract {
         ))
 
         // encode and push source address field
-        encRet.push(...OutgoingFrame.encodeAddressField(
+        encRet.push(...OutgoingAbstract.encodeAddressField(
             this.sourceCallsign, // already uppercased via KissConnection.setMyCallsign() and gets padded in OutgoingFrame.encodeAddressField
             this.sourceCommandBit,
             this.sourceReservedBitOne,
@@ -359,7 +390,7 @@ export abstract class OutgoingFrame extends BaseAbstract {
         if (this.repeaters.length > 0) {
             for (let i = 0; i < this.repeaters.length; i++) {
                 encRet.push(...
-                    OutgoingFrame.encodeAddressField(
+                    OutgoingAbstract.encodeAddressField(
                         this.repeaters[i].callsign,
                         this.repeaters[i].hasBeenRepeated ?? false, // indicates whether this repeater has already repeated the packet, this bit is flipped by the repeater
                         this.repeaters[i].reservedBitOne ?? false, // currently unused
@@ -374,13 +405,13 @@ export abstract class OutgoingFrame extends BaseAbstract {
         // encode control field
         let ctl: number | number[]
         if (this.type === 'information') {
-            ctl = OutgoingFrame.encodeControlField(this.modulo, this.receivedSequence!, this.pollOrFinal, this.sendSequence!)
+            ctl = OutgoingAbstract.encodeControlField(this.modulo, this.receivedSequence!, this.pollOrFinal, this.sendSequence!)
         }
         else if (this.type === 'unnumbered') {
-            ctl = OutgoingFrame.encodeControlField(this.modulo, this.binaryOne!, this.pollOrFinal, this.binaryTwo!)
+            ctl = OutgoingAbstract.encodeControlField(this.modulo, this.binaryOne!, this.pollOrFinal, this.binaryTwo!)
         }
         else {
-            ctl = OutgoingFrame.encodeControlField(this.modulo, this.receivedSequence!, this.pollOrFinal, this.binaryTwo!)
+            ctl = OutgoingAbstract.encodeControlField(this.modulo, this.receivedSequence!, this.pollOrFinal, this.binaryTwo!)
         }
         Array.isArray(ctl) ? encRet.push(...ctl) : encRet.push(ctl)
 
@@ -393,12 +424,7 @@ export abstract class OutgoingFrame extends BaseAbstract {
                 // do nothing
             }
             else if (typeof this.payload === 'object') {
-                if (
-                    (Array.isArray(this.payload) && this.payload.every(item => typeof item === 'number')) ||
-                    Buffer.isBuffer(this.payload) ||
-                    this.payload instanceof Uint8Array ||
-                    this.payload instanceof Uint8ClampedArray
-                ) {
+                if (this.payload instanceof Uint8Array || this.payload instanceof Uint8ClampedArray) {
                     encRet.push(...this.payload)
                 }
                 else {
@@ -432,7 +458,7 @@ export abstract class OutgoingFrame extends BaseAbstract {
         encRet.unshift(0xC0) // FEND flag
         encRet.push(0xC0) // FEND flag
 
-        return encRet
+        return new Uint8Array(encRet)
     }
 
 }
