@@ -45,5 +45,5 @@
     "prepublishOnly": "tsc"
   },
   "type": "module",
-  "types": "./dist/types.d.ts"
+  "types": "dist/index.d.ts"
 }
