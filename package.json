@@ -42,8 +42,7 @@
     "build": "tsc",
     "test": "jest",
     "typedoc": "typedoc src/index.ts --exclude \"scratch.ts tests.test.ts\" --html docs",
-    "prepublishOnly": "tsc",
-    "postpublish": "rm -r dist"
+    "prepublishOnly": "tsc"
   },
   "type": "module",
   "types": "./dist/types.d.ts"
